@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Data Tracker",
+  "version": "1.0",
+  "description": "A Chrome extension to monitor data usage per website.",
+  "permissions": [
+    "webRequest",
+    "storage",
+    "activeTab",
+    "notifications",
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
+    "webNavigation",
+    "alarms"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "declarative_net_request": {}
+}

@@ -1,0 +1,42 @@
+body {
+  font-family: sans-serif;
+  width: 300px;
+}
+
+h1 {
+  text-align: center;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+th {
+  background-color: #f2f2f2;
+}
+
+#paused-container ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+#paused-container li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+}
+
+.footer {
+  text-align: center;
+  margin-top: 10px;
+  border-top: 1px solid #ddd;
+  padding-top: 5px;
+}
