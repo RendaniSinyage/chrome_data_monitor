@@ -1,25 +1,36 @@
 body {
   font-family: sans-serif;
-  width: 300px;
+  width: 400px;
 }
 
-h1 {
+h1, h2 {
+  font-size: 1.2em;
   text-align: center;
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
+.initiator {
+  border: 1px solid #ccc;
+  margin-bottom: 5px;
+  border-radius: 3px;
 }
 
-th, td {
-  border: 1px solid #ddd;
-  padding: 8px;
-  text-align: left;
+.header {
+  background-color: #f0f0f0;
+  padding: 5px;
+  cursor: pointer;
 }
 
-th {
-  background-color: #f2f2f2;
+.details {
+  display: none;
+  padding: 5px;
+}
+
+.initiator.expanded .details {
+  display: block;
+}
+
+.request {
+  padding-left: 10px;
 }
 
 #paused-container ul {
@@ -31,12 +42,6 @@ th {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 5px 0;
-}
-
-.footer {
-  text-align: center;
-  margin-top: 10px;
-  border-top: 1px solid #ddd;
-  padding-top: 5px;
+  padding: 5px;
+  border-bottom: 1px solid #eee;
 }

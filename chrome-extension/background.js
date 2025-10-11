@@ -68,37 +68,60 @@ async function unpauseDomain(domain) {
 // --- Event Listeners ---
 chrome.webRequest.onCompleted.addListener(
   async (details) => {
+    const { initiator, url, responseHeaders, tabId } = details;
+    const requestDomain = new URL(url).hostname;
+
+    let initiatorDomain;
+    try {
+        // Use the initiator if it exists, otherwise fall back to the request's own domain
+        initiatorDomain = initiator ? new URL(initiator).hostname : requestDomain;
+    } catch (e) {
+        // If initiator is not a valid URL (e.g., "null"), fall back to the request domain
+        initiatorDomain = requestDomain;
+    }
+
+    // Ignore requests initiated by the extension itself
+    if (initiator && initiator.startsWith(chrome.runtime.id)) {
+        return;
+    }
+
     const { pausedDomains = [] } = await chrome.storage.local.get('pausedDomains');
-    const url = new URL(details.url);
-    const domain = url.hostname;
+    if (pausedDomains.includes(initiatorDomain)) return;
 
-    if (pausedDomains.includes(domain)) return;
-
-    const headers = details.responseHeaders;
-    const contentLength = headers.find(h => h.name.toLowerCase() === 'content-length');
+    const contentLength = responseHeaders.find(h => h.name.toLowerCase() === 'content-length');
     const size = contentLength ? parseInt(contentLength.value, 10) : 0;
 
-    if (!domainDataUsage[domain]) {
-      domainDataUsage[domain] = { totalSize: 0, warned: false, paused: false };
+    // Initialize initiator data if it doesn't exist
+    if (!domainDataUsage[initiatorDomain]) {
+      domainDataUsage[initiatorDomain] = { totalSize: 0, requests: {}, warned: false, paused: false };
     }
-    domainDataUsage[domain].totalSize += size;
+
+    // Initialize request data within the initiator if it doesn't exist
+    if (!domainDataUsage[initiatorDomain].requests[requestDomain]) {
+        domainDataUsage[initiatorDomain].requests[requestDomain] = { totalSize: 0 };
+    }
+
+    // Accumulate sizes
+    domainDataUsage[initiatorDomain].totalSize += size;
+    domainDataUsage[initiatorDomain].requests[requestDomain].totalSize += size;
 
     const PAUSE_THRESHOLD = 1024 * 1024 * 1024;
     const WARNING_THRESHOLD = 500 * 1024 * 1024;
 
-    if (domainDataUsage[domain].totalSize > PAUSE_THRESHOLD && !domainDataUsage[domain].paused) {
-        chrome.notifications.create(`pause-${domain}`, { type: 'basic', iconUrl: 'icon.png', title: 'Data Limit Exceeded', message: `Site "${domain}" used over 1GB.`, buttons: [{ title: 'Pause Site' }]});
-        domainDataUsage[domain].paused = true;
-    } else if (domainDataUsage[domain].totalSize > WARNING_THRESHOLD && !domainDataUsage[domain].warned) {
-        chrome.notifications.create({ type: 'basic', iconUrl: 'icon.png', title: 'High Data Usage', message: `Site "${domain}" used over 500MB.`});
-        domainDataUsage[domain].warned = true;
+    if (domainDataUsage[initiatorDomain].totalSize > PAUSE_THRESHOLD && !domainDataUsage[initiatorDomain].paused) {
+        chrome.notifications.create(`pause-${initiatorDomain}`, { type: 'basic', iconUrl: 'icon.png', title: 'Data Limit Exceeded', message: `Site "${initiatorDomain}" used over 1GB.`, buttons: [{ title: 'Pause Site' }]});
+        domainDataUsage[initiatorDomain].paused = true;
+    } else if (domainDataUsage[initiatorDomain].totalSize > WARNING_THRESHOLD && !domainDataUsage[initiatorDomain].warned) {
+        chrome.notifications.create({ type: 'basic', iconUrl: 'icon.png', title: 'High Data Usage', message: `Site "${initiatorDomain}" used over 500MB.`});
+        domainDataUsage[initiatorDomain].warned = true;
     }
+
     await chrome.storage.local.set({ dataUsage: domainDataUsage });
 
-    chrome.tabs.get(details.tabId, (tab) => {
+    chrome.tabs.get(tabId, (tab) => {
         if (tab && !tab.active) {
-            if (!backgroundActivity[domain]) {
-                backgroundActivity[domain] = { firstRequestTime: Date.now() };
+            if (!backgroundActivity[initiatorDomain]) {
+                backgroundActivity[initiatorDomain] = { firstRequestTime: Date.now() };
             }
         }
     });
