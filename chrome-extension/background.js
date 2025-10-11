@@ -103,7 +103,7 @@ chrome.webRequest.onCompleted.addListener(
         }
     });
   },
-  { urls: ['<all_urls>'], types: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'object', 'xmlhttprequest', 'other'] },
+  { urls: ['<all_urls>'], types: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'object', 'xmlhttprequest', 'media', 'other'] },
   ['responseHeaders']
 );
 
