@@ -1,47 +1,95 @@
 body {
-  font-family: sans-serif;
-  width: 400px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    width: 450px;
+    background-color: #f7f8fc;
+    color: #333;
 }
 
-h1, h2 {
-  font-size: 1.2em;
-  text-align: center;
+.header-container {
+    background-color: #ffffff;
+    padding: 15px 20px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.initiator {
-  border: 1px solid #ccc;
-  margin-bottom: 5px;
-  border-radius: 3px;
+h1 {
+    font-size: 1.4em;
+    margin: 0;
+    color: #2c3e50;
 }
 
-.header {
-  background-color: #f0f0f0;
-  padding: 5px;
-  cursor: pointer;
+#total-usage {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #3498db;
 }
 
-.details {
-  display: none;
-  padding: 5px;
+#sites-container {
+    margin-top: 10px;
+    max-height: 400px;
+    overflow-y: auto;
 }
 
-.initiator.expanded .details {
-  display: block;
+.site-entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid #ecf0f1;
+    background-color: #ffffff;
 }
 
-.request {
-  padding-left: 10px;
+.site-info {
+    display: flex;
+    flex-direction: column;
 }
 
-#paused-container ul {
-  list-style-type: none;
-  padding: 0;
+.site-domain {
+    font-weight: bold;
+    font-size: 1.1em;
 }
 
-#paused-container li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 5px;
-  border-bottom: 1px solid #eee;
+.site-usage {
+    color: #7f8c8d;
+    font-size: 0.9em;
+}
+
+.site-controls button {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    color: white;
+    transition: background-color 0.2s;
+}
+
+.pause-btn {
+    background-color: #e74c3c;
+}
+
+.pause-btn:hover {
+    background-color: #c0392b;
+}
+
+.unpause-btn {
+    background-color: #2ecc71;
+}
+
+.unpause-btn:hover {
+    background-color: #27ae60;
+}
+
+.site-entry.paused .site-domain {
+    text-decoration: line-through;
+    color: #95a5a6;
+}
+
+#loading-message {
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+    color: #7f8c8d;
 }

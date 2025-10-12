@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Data Tracker</title>
-  <link rel="stylesheet" type="text/css" href="popup.css">
+    <title>Data Tracker</title>
+    <link rel="stylesheet" type="text/css" href="popup.css">
 </head>
 <body>
-  <h1>Data Usage by Site</h1>
-  <div id="data-container"></div>
-
-  <h2>Paused Sites</h2>
-  <div id="paused-container"></div>
-
-  <script src="popup.js"></script>
+    <div class="header-container">
+        <h1>Data Usage</h1>
+        <div id="total-usage"></div>
+    </div>
+    <div id="loading-message">Loading data...</div>
+    <div id="sites-container"></div>
+    <script src="popup.js"></script>
 </body>
 </html>

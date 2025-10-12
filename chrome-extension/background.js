@@ -1,23 +1,30 @@
 // --- Data and State Management ---
 const domainDataUsage = {};
 const backgroundActivity = {};
+let isDirty = false;
 
 // --- Initialization ---
-chrome.runtime.onStartup.addListener(() => {
-    loadInitialData();
-});
+chrome.runtime.onStartup.addListener(loadInitialData);
 
 chrome.runtime.onInstalled.addListener(() => {
     loadInitialData();
+    chrome.alarms.create('dataSaver', { periodInMinutes: 1 / 30 }); // Save every 2 seconds
     chrome.alarms.create('backgroundActivityChecker', { periodInMinutes: 1 });
 });
 
-function loadInitialData() {
-    chrome.storage.local.get('dataUsage', (result) => {
-        if (result.dataUsage) {
-            Object.assign(domainDataUsage, result.dataUsage);
-        }
-    });
+async function loadInitialData() {
+    const result = await chrome.storage.local.get('dataUsage');
+    if (result.dataUsage) {
+        Object.assign(domainDataUsage, result.dataUsage);
+    }
+}
+
+// --- Throttled Data Saving ---
+async function saveData() {
+    if (isDirty) {
+        await chrome.storage.local.set({ dataUsage: domainDataUsage });
+        isDirty = false;
+    }
 }
 
 // --- Hashing for Deterministic Rule IDs ---
@@ -116,7 +123,7 @@ chrome.webRequest.onCompleted.addListener(
         domainDataUsage[initiatorDomain].warned = true;
     }
 
-    await chrome.storage.local.set({ dataUsage: domainDataUsage });
+    isDirty = true;
 
     chrome.tabs.get(tabId, (tab) => {
         if (tab && !tab.active) {
@@ -155,7 +162,10 @@ chrome.webNavigation.onCommitted.addListener(async (details) => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'unpauseDomain') {
         unpauseDomain(request.domain).then(() => sendResponse({ success: true }));
-        return true;
+        return true; // Indicates asynchronous response
+    } else if (request.action === 'pauseDomain') {
+        pauseDomain(request.domain).then(() => sendResponse({ success: true }));
+        return true; // Indicates asynchronous response
     }
 });
 
@@ -170,7 +180,9 @@ chrome.tabs.onActivated.addListener(activeInfo => {
 });
 
 chrome.alarms.onAlarm.addListener(alarm => {
-    if (alarm.name === 'backgroundActivityChecker') {
+    if (alarm.name === 'dataSaver') {
+        saveData();
+    } else if (alarm.name === 'backgroundActivityChecker') {
         const now = Date.now();
         for (const domain in backgroundActivity) {
             if (now - backgroundActivity[domain].firstRequestTime > 300000) {
