@@ -134,6 +134,11 @@ h1 {
     margin-top: 2px;
 }
 
+.site-controls {
+    position: relative;
+    display: flex;
+}
+
 .site-controls button {
     padding: 8px 12px;
     border: none;
@@ -158,6 +163,38 @@ h1 {
 
 .unpause-btn:hover {
     background-color: #27ae60;
+}
+
+.auto-pause-btn {
+    background-color: #95a5a6;
+    margin-right: 5px;
+}
+
+.auto-pause-btn.active {
+    background-color: #f39c12;
+}
+
+.time-menu {
+    position: absolute;
+    right: 20px;
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    z-index: 10;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.time-menu.hidden {
+    display: none;
+}
+
+.time-menu-item {
+    padding: 10px;
+    cursor: pointer;
+}
+
+.time-menu-item:hover {
+    background-color: #f0f0f0;
 }
 
 .site-entry.paused .site-domain {
@@ -190,11 +227,15 @@ h1 {
     padding: 5px;
     border-radius: 50%;
     margin-left: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.icon-btn img {
+.icon-btn svg {
     width: 20px;
     height: 20px;
+    fill: #7f8c8d;
 }
 
 .icon-btn:hover {
@@ -243,4 +284,43 @@ h1 {
 
 #save-settings-btn:hover {
     background-color: #2980b9;
+}
+
+.danger-btn {
+    background-color: #e74c3c;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 10px;
+}
+
+.danger-btn:hover {
+    background-color: #c0392b;
+}
+
+/* --- Calendar --- */
+#calendar-container {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+    width: 250px;
+}
+
+.calendar-day {
+    text-align: center;
+    padding: 5px;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.calendar-day.selected {
+    background-color: #3498db;
+    color: white;
+}
+
+.calendar-day:hover:not(.selected) {
+    background-color: #f0f0f0;
 }

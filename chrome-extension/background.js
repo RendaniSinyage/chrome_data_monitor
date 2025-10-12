@@ -212,10 +212,27 @@ chrome.webNavigation.onCommitted.addListener(async (details) => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'unpauseDomain') {
         unpauseDomain(request.domain).then(() => sendResponse({ success: true }));
-        return true; // Indicates asynchronous response
+        return true;
     } else if (request.action === 'pauseDomain') {
         pauseDomain(request.domain).then(() => sendResponse({ success: true }));
-        return true; // Indicates asynchronous response
+        return true;
+    } else if (request.action === 'clearAllData') {
+        clearData().then(() => sendResponse({ success: true }));
+        return true;
+    } else if (request.action === 'setAutoPause') {
+        const { domain, minutes } = request;
+        chrome.storage.local.get('autoPauseSettings', ({ autoPauseSettings = {} }) => {
+            if (minutes === 'clear') {
+                delete autoPauseSettings[domain];
+                chrome.alarms.clear(`auto-pause-${domain}`);
+            } else {
+                autoPauseSettings[domain] = minutes;
+                chrome.alarms.create(`auto-pause-${domain}`, { delayInMinutes: parseInt(minutes, 10) });
+            }
+            chrome.storage.local.set({ autoPauseSettings });
+            sendResponse({ success: true });
+        });
+        return true;
     }
 });
 
@@ -262,6 +279,17 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
                 if (now.getDate() === settings.resetDay) {
                     await clearData();
                 }
+            }
+        }
+    } else if (alarm.name.startsWith('auto-pause-')) {
+        const domain = alarm.name.replace('auto-pause-', '');
+        await pauseDomain(domain);
+
+        // Also pause services that are only used by this domain
+        for (const service in serviceUsageMap) {
+            const users = serviceUsageMap[service];
+            if (users.size === 1 && users.has(domain)) {
+                await pauseDomain(service);
             }
         }
     }

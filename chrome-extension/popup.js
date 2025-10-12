@@ -7,8 +7,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsBtn = document.getElementById('settings-btn');
     const settingsView = document.getElementById('settings-view');
     const saveSettingsBtn = document.getElementById('save-settings-btn');
-    const resetDayInput = document.getElementById('reset-day');
+    const calendarContainer = document.getElementById('calendar-container');
     const resetPeriodSelect = document.getElementById('reset-period');
+    let selectedResetDay = null;
+
+    // --- Calendar Logic ---
+    function generateCalendar(selectedDay) {
+        calendarContainer.innerHTML = '';
+        for (let i = 1; i <= 31; i++) {
+            const dayEl = document.createElement('div');
+            dayEl.className = 'calendar-day';
+            dayEl.textContent = i;
+            if (i === selectedDay) {
+                dayEl.classList.add('selected');
+            }
+            dayEl.addEventListener('click', () => {
+                selectedResetDay = i;
+                generateCalendar(i);
+            });
+            calendarContainer.appendChild(dayEl);
+        }
+    }
 
     // --- Settings Logic ---
     settingsBtn.addEventListener('click', () => {
@@ -17,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     saveSettingsBtn.addEventListener('click', () => {
         const settings = {
-            resetDay: parseInt(resetDayInput.value, 10),
+            resetDay: selectedResetDay,
             resetPeriod: parseInt(resetPeriodSelect.value, 10)
         };
         chrome.storage.local.set({ settings });
@@ -27,9 +46,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadSettings() {
         const { settings } = await chrome.storage.local.get('settings');
         if (settings) {
-            resetDayInput.value = settings.resetDay;
+            selectedResetDay = settings.resetDay;
             resetPeriodSelect.value = settings.resetPeriod;
         }
+        generateCalendar(selectedResetDay);
     }
 
     // --- Tab Switching Logic ---
@@ -55,11 +75,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Rendering Logic ---
-    function renderSites(dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs) {
+    function renderSites(dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings) {
         sitesContainer.innerHTML = '';
         loadingMessageEl.style.display = 'none';
 
-        const allDomains = new Set([...Object.keys(dataUsage), ...pausedDomains]);
+        const allDomains = new Set(Object.keys(dataUsage));
+        pausedDomains.forEach(domain => allDomains.add(domain));
+
         if (allDomains.size === 0) {
             sitesContainer.innerHTML = '<div class="site-entry"><div class="site-info">No data tracked yet.</div></div>';
             return;
@@ -77,15 +99,15 @@ document.addEventListener('DOMContentLoaded', () => {
             totalBytes += usage;
             const isPaused = pausedDomains.includes(domain);
             const tabCount = tabCounts[domain] || 0;
-            const serviceUsers = serviceUsageMap[domain] ? serviceUsageMap[domain].length : 0;
+            const serviceUsers = serviceUsageMap[domain] ? serviceUsageMap[domain].size : 0;
             const singleTabInfo = singleTabs[domain];
-            createSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo);
+            createSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo, autoPauseSettings);
         }
 
         totalUsageEl.textContent = formatBytes(totalBytes);
     }
 
-    function createSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo) {
+    function createSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo, autoPauseSettings) {
         const siteEntry = document.createElement('div');
         siteEntry.className = 'site-entry';
         if (isPaused) {
@@ -131,16 +153,48 @@ document.addEventListener('DOMContentLoaded', () => {
         const siteControls = document.createElement('div');
         siteControls.className = 'site-controls';
 
-        const button = document.createElement('button');
-        button.textContent = isPaused ? 'Unpause' : 'Pause';
-        button.className = isPaused ? 'unpause-btn' : 'pause-btn';
+        const autoPauseBtn = document.createElement('button');
+        autoPauseBtn.className = 'auto-pause-btn';
+        autoPauseBtn.textContent = 'Auto';
+        if (autoPauseSettings && autoPauseSettings[domain]) {
+            autoPauseBtn.classList.add('active');
+        }
 
-        button.onclick = () => {
+        const pauseBtn = document.createElement('button');
+        pauseBtn.textContent = isPaused ? 'Unpause' : 'Pause';
+        pauseBtn.className = isPaused ? 'unpause-btn' : 'pause-btn';
+
+        pauseBtn.onclick = () => {
             const action = isPaused ? 'unpauseDomain' : 'pauseDomain';
             chrome.runtime.sendMessage({ action, domain });
         };
 
-        siteControls.appendChild(button);
+        const timeMenu = document.createElement('div');
+        timeMenu.className = 'time-menu hidden';
+        [15, 60, 120, 'clear'].forEach(value => {
+            const item = document.createElement('div');
+            item.className = 'time-menu-item';
+            if (value === 'clear') {
+                item.textContent = 'Clear Auto-Pause';
+            } else {
+                item.textContent = `Pause in ${value} min`;
+            }
+            item.dataset.value = value;
+            item.addEventListener('click', () => {
+                chrome.runtime.sendMessage({ action: 'setAutoPause', domain: domain, minutes: value });
+                timeMenu.classList.add('hidden');
+            });
+            timeMenu.appendChild(item);
+        });
+
+        autoPauseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            timeMenu.classList.toggle('hidden');
+        });
+
+        siteControls.appendChild(autoPauseBtn);
+        siteControls.appendChild(pauseBtn);
+        siteControls.appendChild(timeMenu);
         siteEntry.appendChild(siteInfo);
         siteEntry.appendChild(siteControls);
         sitesContainer.appendChild(siteEntry);
@@ -152,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sitesContainer.innerHTML = '';
 
         const [storageData, tabs] = await Promise.all([
-            chrome.storage.local.get(['dataUsage', 'pausedDomains', 'serviceUsageMap']),
+            chrome.storage.local.get(['dataUsage', 'pausedDomains', 'serviceUsageMap', 'autoPauseSettings']),
             chrome.tabs.query({})
         ]);
 
@@ -185,7 +239,8 @@ document.addEventListener('DOMContentLoaded', () => {
             storageData.pausedDomains || [],
             tabCounts,
             storageData.serviceUsageMap || {},
-            singleTabs
+            singleTabs,
+            storageData.autoPauseSettings || {}
         );
     }
 
@@ -193,6 +248,16 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.onChanged.addListener((changes, namespace) => {
         if (namespace === 'local' && (changes.dataUsage || changes.pausedDomains)) {
             updateUI();
+        }
+    });
+
+    const versionNumberEl = document.getElementById('version-number');
+    versionNumberEl.textContent = chrome.runtime.getManifest().version;
+
+    const clearDataBtn = document.getElementById('clear-data-btn');
+    clearDataBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
+            chrome.runtime.sendMessage({ action: 'clearAllData' });
         }
     });
 
