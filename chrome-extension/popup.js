@@ -348,7 +348,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 resetPeriod: 30 // Default to 30 days
             };
             chrome.storage.local.set({ settings, isSetupComplete: true }, () => {
-                document.body.classList.remove('setup');
+                setupView.style.display = 'none';
+                mainView.style.display = 'block';
                 initializeMainView();
             });
         }
