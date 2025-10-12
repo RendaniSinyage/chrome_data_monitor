@@ -93,21 +93,41 @@ document.addEventListener('DOMContentLoaded', () => {
             return usageB - usageA;
         });
 
+        const highUsageSites = [];
+        const lowUsageSites = [];
+        let lowUsageTotal = 0;
+        const LOW_USAGE_THRESHOLD = 10 * 1024 * 1024; // 10MB
+
         let totalBytes = 0;
         for (const domain of sortedDomains) {
             const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
             totalBytes += usage;
+            if (usage < LOW_USAGE_THRESHOLD) {
+                lowUsageSites.push(domain);
+                lowUsageTotal += usage;
+            } else {
+                highUsageSites.push(domain);
+            }
+        }
+
+        for (const domain of highUsageSites) {
+            const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
             const isPaused = pausedDomains.includes(domain);
             const tabCount = tabCounts[domain] || 0;
             const serviceUsers = serviceUsageMap[domain] ? serviceUsageMap[domain].size : 0;
             const singleTabInfo = singleTabs[domain];
-            createSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo, autoPauseSettings);
+            const siteEntry = createSingleSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo, autoPauseSettings);
+            sitesContainer.appendChild(siteEntry);
+        }
+
+        if (lowUsageSites.length > 0) {
+            createCompactedEntry(lowUsageSites, lowUsageTotal, dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings);
         }
 
         totalUsageEl.textContent = formatBytes(totalBytes);
     }
 
-    function createSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo, autoPauseSettings) {
+    function createSingleSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo, autoPauseSettings) {
         const siteEntry = document.createElement('div');
         siteEntry.className = 'site-entry';
         if (isPaused) {
@@ -171,21 +191,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const timeMenu = document.createElement('div');
         timeMenu.className = 'time-menu hidden';
-        [15, 60, 120, 'clear'].forEach(value => {
-            const item = document.createElement('div');
-            item.className = 'time-menu-item';
-            if (value === 'clear') {
-                item.textContent = 'Clear Auto-Pause';
-            } else {
-                item.textContent = `Pause in ${value} min`;
-            }
-            item.dataset.value = value;
-            item.addEventListener('click', () => {
-                chrome.runtime.sendMessage({ action: 'setAutoPause', domain: domain, minutes: value });
+
+        const timeInput = document.createElement('input');
+        timeInput.type = 'time';
+        timeMenu.appendChild(timeInput);
+
+        const setTimeBtn = document.createElement('button');
+        setTimeBtn.textContent = 'Set';
+        setTimeBtn.addEventListener('click', () => {
+            if (timeInput.value) {
+                chrome.runtime.sendMessage({ action: 'setAutoPause', domain: domain, time: timeInput.value });
                 timeMenu.classList.add('hidden');
-            });
-            timeMenu.appendChild(item);
+            }
         });
+        timeMenu.appendChild(setTimeBtn);
+
+        const clearTimeBtn = document.createElement('button');
+        clearTimeBtn.textContent = 'Clear';
+        clearTimeBtn.addEventListener('click', () => {
+            chrome.runtime.sendMessage({ action: 'clearAutoPause', domain: domain });
+            timeMenu.classList.add('hidden');
+        });
+        timeMenu.appendChild(clearTimeBtn);
 
         autoPauseBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -197,7 +224,34 @@ document.addEventListener('DOMContentLoaded', () => {
         siteControls.appendChild(timeMenu);
         siteEntry.appendChild(siteInfo);
         siteEntry.appendChild(siteControls);
-        sitesContainer.appendChild(siteEntry);
+        return siteEntry;
+    }
+
+    function createCompactedEntry(sites, totalUsage, dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings) {
+        const compactedEntry = document.createElement('div');
+        compactedEntry.className = 'site-entry compacted';
+
+        const header = document.createElement('div');
+        header.className = 'header';
+        header.textContent = `Low-usage sites (${sites.length}) - ${formatBytes(totalUsage)}`;
+        header.addEventListener('click', () => {
+            compactedEntry.classList.toggle('expanded');
+        });
+        compactedEntry.appendChild(header);
+
+        const details = document.createElement('div');
+        details.className = 'details';
+        for (const domain of sites) {
+            const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
+            const isPaused = pausedDomains.includes(domain);
+            const tabCount = tabCounts[domain] || 0;
+            const serviceUsers = serviceUsageMap[domain] ? serviceUsageMap[domain].size : 0;
+            const singleTabInfo = singleTabs[domain];
+            const siteEntry = createSingleSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo, autoPauseSettings);
+            details.appendChild(siteEntry);
+        }
+        compactedEntry.appendChild(details);
+        sitesContainer.appendChild(compactedEntry);
     }
 
     // --- Data Fetching and Updates ---

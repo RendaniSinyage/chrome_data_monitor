@@ -220,15 +220,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         clearData().then(() => sendResponse({ success: true }));
         return true;
     } else if (request.action === 'setAutoPause') {
-        const { domain, minutes } = request;
+        const { domain, time } = request;
         chrome.storage.local.get('autoPauseSettings', ({ autoPauseSettings = {} }) => {
-            if (minutes === 'clear') {
-                delete autoPauseSettings[domain];
-                chrome.alarms.clear(`auto-pause-${domain}`);
-            } else {
-                autoPauseSettings[domain] = minutes;
-                chrome.alarms.create(`auto-pause-${domain}`, { delayInMinutes: parseInt(minutes, 10) });
+            const [hours, minutes] = time.split(':');
+            const now = new Date();
+            const alarmTime = new Date();
+            alarmTime.setHours(hours, minutes, 0, 0);
+            if (alarmTime < now) {
+                alarmTime.setDate(alarmTime.getDate() + 1);
             }
+            const delayInMinutes = (alarmTime - now) / (1000 * 60);
+
+            autoPauseSettings[domain] = { time: time };
+            chrome.alarms.create(`auto-pause-${domain}`, {
+                when: alarmTime.getTime(),
+                periodInMinutes: 24 * 60
+            });
+            chrome.storage.local.set({ autoPauseSettings });
+            sendResponse({ success: true });
+        });
+        return true;
+    } else if (request.action === 'clearAutoPause') {
+        const { domain } = request;
+        chrome.storage.local.get('autoPauseSettings', ({ autoPauseSettings = {} }) => {
+            delete autoPauseSettings[domain];
+            chrome.alarms.clear(`auto-pause-${domain}`);
             chrome.storage.local.set({ autoPauseSettings });
             sendResponse({ success: true });
         });
