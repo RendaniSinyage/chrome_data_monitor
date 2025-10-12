@@ -92,112 +92,44 @@ async function unpauseDomain(domain) {
 // --- Event Listeners ---
 chrome.webRequest.onCompleted.addListener(
   async (details) => {
-    const { initiator, url, responseHeaders, tabId } = details;
-    const requestDomain = new URL(url).hostname;
+    const { tabId, responseHeaders, url } = details;
 
-    let initiatorDomain;
-    // Prioritize getting the initiator from the tab URL for accuracy
-    if (tabId !== -1) {
-        try {
-            const tab = await new Promise((resolve, reject) => {
-                chrome.tabs.get(tabId, (tab) => {
-                    if (chrome.runtime.lastError) {
-                        return reject(chrome.runtime.lastError);
-                    }
-                    resolve(tab);
-                });
-            });
-            if (tab && tab.url) {
-                initiatorDomain = new URL(tab.url).hostname;
-                // If the request is for a different domain, map the service to the initiator
-                if (initiatorDomain !== requestDomain) {
-                    if (!serviceUsageMap[requestDomain]) {
-                        serviceUsageMap[requestDomain] = new Set();
-                    }
-                    serviceUsageMap[requestDomain].add(initiatorDomain);
-                }
-            }
-        } catch (e) {
-            // Tab might be closed, fall back to other methods
+    if (tabId === -1) {
+      // Ignore background requests for now
+      return;
+    }
+
+    try {
+        const tab = await chrome.tabs.get(tabId);
+        if (!tab || !tab.url || tab.url.startsWith('chrome://')) {
+            return;
         }
-    }
 
-    // Fallback for background requests or when tab info is unavailable
-    if (!initiatorDomain) {
-        const users = serviceUsageMap[requestDomain];
-        if (users && users.size === 1) {
-            // If one site uses this service, attribute the data to that site
-            initiatorDomain = Array.from(users)[0];
-        } else {
-            // Otherwise, attribute to the service itself or the request's origin
-            try {
-                initiatorDomain = initiator ? new URL(initiator).hostname : requestDomain;
-            } catch (e) {
-                initiatorDomain = requestDomain;
-            }
+        const domain = new URL(tab.url).hostname;
+        const { pausedDomains = [] } = await chrome.storage.local.get('pausedDomains');
+        if (pausedDomains.includes(domain)) {
+            return;
         }
-    }
 
-    // Ignore requests initiated by the extension itself
-    if (initiator && initiator.startsWith(chrome.runtime.id)) {
-        return;
-    }
+        const contentLength = responseHeaders.find(h => h.name.toLowerCase() === 'content-length');
+        const size = contentLength ? parseInt(contentLength.value, 10) : 0;
 
-    const { pausedDomains = [] } = await chrome.storage.local.get('pausedDomains');
-    if (pausedDomains.includes(initiatorDomain)) return;
-
-    const contentLength = responseHeaders.find(h => h.name.toLowerCase() === 'content-length');
-    const size = contentLength ? parseInt(contentLength.value, 10) : 0;
-
-    // Initialize initiator data if it doesn't exist
-    if (!domainDataUsage[initiatorDomain]) {
-      domainDataUsage[initiatorDomain] = { totalSize: 0, tabs: {}, requests: {}, warned: false, paused: false };
-    }
-
-    // Initialize request data within the initiator if it doesn't exist
-    if (!domainDataUsage[initiatorDomain].requests[requestDomain]) {
-        domainDataUsage[initiatorDomain].requests[requestDomain] = { totalSize: 0 };
-    }
-
-    // Accumulate sizes
-    domainDataUsage[initiatorDomain].totalSize += size;
-    domainDataUsage[initiatorDomain].requests[requestDomain].totalSize += size;
-
-    // Track per-tab usage
-    if (tabId !== -1) {
-        try {
-            const tab = await new Promise((resolve, reject) => {
-                chrome.tabs.get(tabId, (tab) => {
-                    if (chrome.runtime.lastError) {
-                        return reject(chrome.runtime.lastError);
-                    }
-                    resolve(tab);
-                });
-            });
-            if (tab) {
-                if (!domainDataUsage[initiatorDomain].tabs[tabId]) {
-                    domainDataUsage[initiatorDomain].tabs[tabId] = { totalSize: 0, title: tab.title };
-                }
-                domainDataUsage[initiatorDomain].tabs[tabId].totalSize += size;
-                domainDataUsage[initiatorDomain].tabs[tabId].title = tab.title; // Update title in case it changes
-            }
-        } catch (e) {
-            // Tab may have been closed
+        if (!domainDataUsage[domain]) {
+            domainDataUsage[domain] = { totalSize: 0, tabs: {} };
         }
+
+        if (!domainDataUsage[domain].tabs[tabId]) {
+            domainDataUsage[domain].tabs[tabId] = { totalSize: 0, title: tab.title };
+        }
+
+        domainDataUsage[domain].totalSize += size;
+        domainDataUsage[domain].tabs[tabId].totalSize += size;
+        domainDataUsage[domain].tabs[tabId].title = tab.title;
+
+        isDirty = true;
+    } catch (e) {
+        // Tab may have been closed
     }
-
-    const PAUSE_THRESHOLD = 1024 * 1024 * 1024;
-    const WARNING_THRESHOLD = 500 * 1024 * 1024;
-
-    if (domainDataUsage[initiatorDomain].totalSize > PAUSE_THRESHOLD && !domainDataUsage[initiatorDomain].paused) {
-        chrome.notifications.create(`pause-${initiatorDomain}`, { type: 'basic', iconUrl: 'icon.png', title: 'Data Limit Exceeded', message: `Site "${initiatorDomain}" used over 1GB.`, buttons: [{ title: 'Pause Site' }]});
-        domainDataUsage[initiatorDomain].paused = true;
-    } else if (domainDataUsage[initiatorDomain].totalSize > WARNING_THRESHOLD && !domainDataUsage[initiatorDomain].warned) {
-        chrome.notifications.create({ type: 'basic', iconUrl: 'icon.png', title: 'High Data Usage', message: `Site "${initiatorDomain}" used over 500MB.`});
-        domainDataUsage[initiatorDomain].warned = true;
-    }
-
-    isDirty = true;
 
     chrome.tabs.get(tabId, (tab) => {
         if (tab && !tab.active) {
