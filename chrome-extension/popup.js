@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Rendering Logic ---
-    function renderSites(dataUsage, pausedDomains) {
+    function renderSites(dataUsage, pausedDomains, tabCounts) {
         sitesContainer.innerHTML = '';
         loadingMessageEl.style.display = 'none';
 
@@ -34,13 +34,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
             totalBytes += usage;
             const isPaused = pausedDomains.includes(domain);
-            createSiteEntry(domain, usage, isPaused);
+            const tabCount = tabCounts[domain] || 0;
+            createSiteEntry(domain, usage, isPaused, tabCount);
         }
 
         totalUsageEl.textContent = formatBytes(totalBytes);
     }
 
-    function createSiteEntry(domain, usage, isPaused) {
+    function createSiteEntry(domain, usage, isPaused, tabCount) {
         const siteEntry = document.createElement('div');
         siteEntry.className = 'site-entry';
         if (isPaused) {
@@ -53,6 +54,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const siteDomain = document.createElement('div');
         siteDomain.className = 'site-domain';
         siteDomain.textContent = domain;
+
+        if (tabCount > 0) {
+            const tabCountEl = document.createElement('span');
+            tabCountEl.className = 'tab-count';
+            tabCountEl.textContent = `${tabCount} tab${tabCount > 1 ? 's' : ''}`;
+            siteDomain.appendChild(tabCountEl);
+        }
 
         const siteUsage = document.createElement('div');
         siteUsage.className = 'site-usage';
@@ -80,10 +88,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Data Fetching and Updates ---
-    function updateUI() {
-        chrome.storage.local.get(['dataUsage', 'pausedDomains'], (result) => {
-            renderSites(result.dataUsage || {}, result.pausedDomains || []);
-        });
+    async function updateUI() {
+        const [storageData, tabs] = await Promise.all([
+            chrome.storage.local.get(['dataUsage', 'pausedDomains']),
+            chrome.tabs.query({})
+        ]);
+
+        const tabCounts = {};
+        for (const tab of tabs) {
+            try {
+                const domain = new URL(tab.url).hostname;
+                tabCounts[domain] = (tabCounts[domain] || 0) + 1;
+            } catch (e) {
+                // Ignore invalid URLs
+            }
+        }
+
+        renderSites(storageData.dataUsage || {}, storageData.pausedDomains || [], tabCounts);
     }
 
     // --- Event Listeners ---
