@@ -1,33 +1,45 @@
-# Data Tracker Chrome Extension
+# Chrome Extension Data Usage Monitor
 
-## Goal
+This Chrome extension provides a robust solution for monitoring data usage on a per-domain basis. It is designed to offer users a clear and organized view of their network consumption, enabling better management of internet resources.
 
-The primary goal of this extension is to provide users with powerful tools to monitor and control their internet data consumption directly within their browser. In an age of data caps and websites with heavy background activity, this extension aims to identify which sites are consuming the most data and provide automated and manual controls to prevent excessive usage.
+## Features
 
-## Features Implemented
+- **Real-time Data Tracking:** Monitors and displays the amount of data downloaded for each domain in real-time.
+- **Detailed Breakdown:** Offers a granular view of data usage for individual websites.
+- **Low-Usage Compacting:** Automatically groups domains using less than 10MB of data into a single, expandable entry to maintain a clean and focused main list.
+- **Tracking Control:** Users can pause and unpause data tracking for specific domains at any time.
+- **Scheduled Auto-Pause:** Provides the ability to set a daily time to automatically pause data tracking for any specified domain.
+- **Tab Counting:** Displays the number of open tabs for each domain, with a clickable link to focus the tab if only one is open.
+- **Automated Data Reset:** The extension can be configured to automatically reset all tracking data on a user-defined schedule.
 
-This extension is equipped with a suite of intelligent features designed to give you full control over your data:
+## Installation
 
-1.  **Data Usage Tracking:**
-    *   The extension monitors all network requests and calculates the total data consumed by each website (domain).
-    *   The popup UI displays a clear, real-time table of data usage per site, measured in megabytes (MB).
+To install this extension, please follow the instructions for loading an unpacked extension in a Chromium-based browser.
 
-2.  **Automated High-Usage Warnings:**
-    *   When any website's data consumption exceeds **500MB**, the extension will automatically send you a desktop notification to make you aware of its high usage.
+1.  **Obtain the Source Code:** Clone or download this repository to a local directory.
+2.  **Access Browser Extensions:** In your browser, navigate to the extensions management page (e.g., `chrome://extensions` for Chrome, `edge://extensions` for Edge).
+3.  **Enable Developer Mode:** Ensure that "Developer mode" is enabled. This is typically a toggle switch in the corner of the page.
+4.  **Load the Extension:**
+    *   Click the "Load unpacked" button.
+    *   In the file dialog, select the `chrome-extension` folder from the source code directory.
+5.  The extension is now installed and will be active.
 
-3.  **Site Pausing at Data Limits:**
-    *   If a website's data usage reaches **1GB**, a notification will appear with a "Pause Site" button.
-    *   Clicking this button will immediately block all further network requests to and from that domain, effectively stopping all data consumption from that site.
+## Compatibility
 
-4.  **"Refresh-on-Demand" for Paused Sites:**
-    *   When a site is paused, you can still manually refresh the page.
-    *   The extension detects this manual refresh and temporarily unpauses the site for **60 seconds**, allowing the latest content to load.
-    *   After the 60-second window, the site is automatically re-paused to prevent further data usage.
+This extension is built on the standard WebExtension API, ensuring broad compatibility with most Chromium-based browsers, including:
 
-5.  **Proactive Background Activity Monitoring:**
-    *   The extension intelligently monitors sites running in background tabs.
-    *   If a site in a non-active tab is detected making continuous network requests for over **5 minutes**, a notification will appear, asking if you would like to pause it. This helps catch misbehaving sites before they reach the high-usage data limits.
+- Google Chrome
+- Microsoft Edge
+- Opera
+- Brave
 
-6.  **Popup Management UI:**
-    *   The extension's popup window provides a central place to see all data usage and manage paused sites.
-    *   A dedicated section lists all currently paused domains, with an "Unpause" button next to each one to easily restore its functionality.
+While functionality is expected to be consistent across browsers, official testing has been conducted primarily on Google Chrome. Minor visual or functional discrepancies may exist on other platforms.
+
+## Contributing
+
+This project welcomes contributions. For bug reports, feature requests, or code submissions, please open an issue or submit a pull request on the project's repository.
+
+## Contributors
+
+- **ROKCT Holdings**
+- **Ray Thompson**

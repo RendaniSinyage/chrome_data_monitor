@@ -130,6 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function createSingleSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo, autoPauseSettings) {
         const siteEntry = document.createElement('div');
         siteEntry.className = 'site-entry';
+        siteEntry.dataset.domain = domain; // Add data-domain attribute
         if (isPaused) {
             siteEntry.classList.add('paused');
         }
@@ -254,6 +255,26 @@ document.addEventListener('DOMContentLoaded', () => {
         sitesContainer.appendChild(compactedEntry);
     }
 
+    // --- Rendering Logic (Optimized) ---
+    function updateNumbers(dataUsage) {
+        let totalBytes = 0;
+        const allDomains = new Set(Object.keys(dataUsage));
+
+        for (const domain of allDomains) {
+            const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
+            totalBytes += usage;
+
+            const siteEntry = sitesContainer.querySelector(`.site-entry[data-domain="${domain}"]`);
+            if (siteEntry) {
+                const usageEl = siteEntry.querySelector('.site-usage');
+                if (usageEl) {
+                    usageEl.textContent = formatBytes(usage);
+                }
+            }
+        }
+        totalUsageEl.textContent = formatBytes(totalBytes);
+    }
+
     // --- Data Fetching and Updates ---
     async function updateUI() {
         loadingMessageEl.style.display = 'block';
@@ -299,9 +320,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Event Listeners ---
+    function handleDataUsageChange(oldData, newData) {
+        const LOW_USAGE_THRESHOLD = 10 * 1024 * 1024; // 10MB
+        const oldKeys = Object.keys(oldData);
+        const newKeys = Object.keys(newData);
+
+        if (oldKeys.length !== newKeys.length) {
+            return true; // A site was added or removed, full redraw needed
+        }
+
+        for (const domain of newKeys) {
+            const oldUsage = oldData[domain] ? oldData[domain].totalSize : 0;
+            const newUsage = newData[domain] ? newData[domain].totalSize : 0;
+
+            const wasBelow = oldUsage < LOW_USAGE_THRESHOLD;
+            const isBelow = newUsage < LOW_USAGE_THRESHOLD;
+
+            if (wasBelow !== isBelow) {
+                return true; // A site crossed the threshold, full redraw needed
+            }
+        }
+
+        return false; // No structural changes, only numbers need updating
+    }
+
     chrome.storage.onChanged.addListener((changes, namespace) => {
-        if (namespace === 'local' && (changes.dataUsage || changes.pausedDomains)) {
-            updateUI();
+        if (namespace !== 'local') return;
+
+        if (changes.pausedDomains) {
+            updateUI(); // Always redraw for pause/unpause changes
+            return;
+        }
+
+        if (changes.dataUsage) {
+            const oldValue = changes.dataUsage.oldValue || {};
+            const newValue = changes.dataUsage.newValue || {};
+            const needsRedraw = handleDataUsageChange(oldValue, newValue);
+
+            if (needsRedraw) {
+                updateUI();
+            } else {
+                updateNumbers(newValue);
+            }
         }
     });
 
