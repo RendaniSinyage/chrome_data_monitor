@@ -16,9 +16,18 @@
         </div>
     </div>
 
-    <div class="tab-container">
-        <button class="tab-link active" data-tab="data-usage-tab">Data Usage</button>
-        <button class="tab-link" data-tab="about-tab">About</button>
+    <div id="setup-view">
+        <h2>Welcome!</h2>
+        <p>Please select a day of the month to reset your data usage.</p>
+        <div id="setup-calendar-container"></div>
+        <button id="save-setup-btn">Save and Start Tracking</button>
+    </div>
+
+    <div id="main-view" class="hidden">
+        <div class="tab-container">
+            <button class="tab-link active" data-tab="data-usage-tab">Data Usage</button>
+            <button class="tab-link" data-tab="about-tab">About</button>
+        </div>
     </div>
 
     <div id="data-usage-tab" class="tab-content active">

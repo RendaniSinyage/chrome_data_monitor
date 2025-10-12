@@ -386,10 +386,65 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- Setup Flow ---
+    const setupView = document.getElementById('setup-view');
+    const mainView = document.getElementById('main-view');
+    const setupCalendarContainer = document.getElementById('setup-calendar-container');
+    const saveSetupBtn = document.getElementById('save-setup-btn');
+    let setupSelectedResetDay = null;
+
+    function generateSetupCalendar(selectedDay) {
+        setupCalendarContainer.innerHTML = '';
+        for (let i = 1; i <= 31; i++) {
+            const dayEl = document.createElement('div');
+            dayEl.className = 'calendar-day';
+            dayEl.textContent = i;
+            if (i === selectedDay) {
+                dayEl.classList.add('selected');
+            }
+            dayEl.addEventListener('click', () => {
+                setupSelectedResetDay = i;
+                generateSetupCalendar(i);
+            });
+            setupCalendarContainer.appendChild(dayEl);
+        }
+    }
+
+    saveSetupBtn.addEventListener('click', () => {
+        if (setupSelectedResetDay) {
+            const settings = {
+                resetDay: setupSelectedResetDay,
+                resetPeriod: 30 // Default to 30 days
+            };
+            chrome.storage.local.set({ settings, isSetupComplete: true }, () => {
+                setupView.classList.add('hidden');
+                mainView.classList.remove('hidden');
+                initializeMainView();
+            });
+        }
+    });
+
+    async function checkSetup() {
+        const { isSetupComplete } = await chrome.storage.local.get('isSetupComplete');
+        if (isSetupComplete) {
+            setupView.classList.add('hidden');
+            mainView.classList.remove('hidden');
+            initializeMainView();
+        } else {
+            setupView.classList.remove('hidden');
+            mainView.classList.add('hidden');
+            generateSetupCalendar(null);
+        }
+    }
+
+    function initializeMainView() {
+        updateUI();
+        loadSettings();
+        loadMonthlyComparison();
+    }
+
     // Initial Load
-    updateUI();
-    loadSettings();
-    loadMonthlyComparison();
+    checkSetup();
 
     async function loadMonthlyComparison() {
         const now = new Date();
