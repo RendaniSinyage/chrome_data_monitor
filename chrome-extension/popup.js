@@ -98,41 +98,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return usageB - usageA;
         });
 
-        const highUsageSites = [];
-        const lowUsageSites = [];
-        let lowUsageTotal = 0;
-        const LOW_USAGE_THRESHOLD = 10 * 1024 * 1024; // 10MB
-
         let totalBytes = 0;
         for (const domain of sortedDomains) {
             const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
             totalBytes += usage;
-            if (usage < LOW_USAGE_THRESHOLD) {
-                lowUsageSites.push(domain);
-                lowUsageTotal += usage;
-            } else {
-                highUsageSites.push(domain);
-            }
-        }
-
-        for (const domain of highUsageSites) {
-            const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
             const isPaused = pausedDomains.includes(domain);
             const tabCount = tabCounts[domain] || 0;
             const serviceUsers = serviceUsageMap[domain] ? serviceUsageMap[domain].size : 0;
             const singleTabInfo = singleTabs[domain];
             const siteEntry = createSingleSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo, autoPauseSettings);
             sitesContainer.appendChild(siteEntry);
-        }
-
-        if (lowUsageSites.length > 0) {
-            // Always show the compacted entry if there are any low-usage sites,
-            // even if there are no high-usage sites.
-            createCompactedEntry(lowUsageSites, lowUsageTotal, dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings);
-        } else if (highUsageSites.length === 0 && allDomains.size > 0) {
-            // This case handles when there are sites, but they are all below the threshold.
-            // In the original code, this would result in a blank screen.
-            createCompactedEntry(sortedDomains, totalBytes, dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings);
         }
 
         totalUsageEl.textContent = formatBytes(totalBytes);
@@ -252,41 +227,6 @@ document.addEventListener('DOMContentLoaded', () => {
         siteEntry.appendChild(siteInfo);
         siteEntry.appendChild(siteControls);
         return siteEntry;
-    }
-
-    function createCompactedEntry(sites, totalUsage, dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings) {
-        const compactedEntry = document.createElement('div');
-        compactedEntry.className = 'site-entry compacted';
-
-        const header = document.createElement('div');
-        header.className = 'header';
-        const headerText = `Low-usage sites (${sites.length}) - ${formatBytes(totalUsage)}`;
-        header.textContent = headerText;
-
-        const hr = document.createElement('hr');
-        hr.style.display = 'none';
-        compactedEntry.appendChild(hr);
-
-        header.addEventListener('click', () => {
-            compactedEntry.classList.toggle('expanded');
-            hr.style.display = compactedEntry.classList.contains('expanded') ? 'block' : 'none';
-            header.textContent = compactedEntry.classList.contains('expanded') ? '' : headerText;
-        });
-        compactedEntry.appendChild(header);
-
-        const details = document.createElement('div');
-        details.className = 'details';
-        for (const domain of sites) {
-            const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
-            const isPaused = pausedDomains.includes(domain);
-            const tabCount = tabCounts[domain] || 0;
-            const serviceUsers = serviceUsageMap[domain] ? serviceUsageMap[domain].size : 0;
-            const singleTabInfo = singleTabs[domain];
-            const siteEntry = createSingleSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo, autoPauseSettings);
-            details.appendChild(siteEntry);
-        }
-        compactedEntry.appendChild(details);
-        sitesContainer.appendChild(compactedEntry);
     }
 
     // --- Data Fetching and Updates ---
@@ -473,7 +413,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const currentMonthUsage = calculateTotalUsage(dataUsage);
         const lastMonthUsage = calculateTotalUsage(lastMonthData);
 
-        document.getElementById('current-month-usage').textContent = formatBytes(currentMonthUsage);
-        document.getElementById('last-month-usage').textContent = formatBytes(lastMonthUsage);
+        totalUsageEl.textContent = formatBytes(currentMonthUsage);
+        if (lastMonthUsage > 0) {
+            const lastMonthEl = document.getElementById('last-month-comparison');
+            lastMonthEl.textContent = ` / Last: ${formatBytes(lastMonthUsage)}`;
+        }
     }
 });
