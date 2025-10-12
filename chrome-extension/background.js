@@ -92,44 +92,44 @@ async function unpauseDomain(domain) {
 // --- Event Listeners ---
 chrome.webRequest.onCompleted.addListener(
   async (details) => {
-    const { tabId, responseHeaders, url } = details;
+    const { initiator, url, responseHeaders, tabId } = details;
 
-    if (tabId === -1) {
-      // Ignore background requests for now
-      return;
+    if (!initiator || initiator.startsWith('chrome-extension://')) {
+        return;
     }
 
-    try {
-        const tab = await chrome.tabs.get(tabId);
-        if (!tab || !tab.url || tab.url.startsWith('chrome://')) {
-            return;
-        }
+    const initiatorDomain = new URL(initiator).hostname;
+    const requestDomain = new URL(url).hostname;
 
-        const domain = new URL(tab.url).hostname;
-        const { pausedDomains = [] } = await chrome.storage.local.get('pausedDomains');
-        if (pausedDomains.includes(domain)) {
-            return;
-        }
-
-        const contentLength = responseHeaders.find(h => h.name.toLowerCase() === 'content-length');
-        const size = contentLength ? parseInt(contentLength.value, 10) : 0;
-
-        if (!domainDataUsage[domain]) {
-            domainDataUsage[domain] = { totalSize: 0, tabs: {} };
-        }
-
-        if (!domainDataUsage[domain].tabs[tabId]) {
-            domainDataUsage[domain].tabs[tabId] = { totalSize: 0, title: tab.title };
-        }
-
-        domainDataUsage[domain].totalSize += size;
-        domainDataUsage[domain].tabs[tabId].totalSize += size;
-        domainDataUsage[domain].tabs[tabId].title = tab.title;
-
-        isDirty = true;
-    } catch (e) {
-        // Tab may have been closed
+    const { pausedDomains = [] } = await chrome.storage.local.get('pausedDomains');
+    if (pausedDomains.includes(initiatorDomain)) {
+        return;
     }
+
+    const contentLength = responseHeaders.find(h => h.name.toLowerCase() === 'content-length');
+    const size = contentLength ? parseInt(contentLength.value, 10) : 0;
+
+    if (!domainDataUsage[initiatorDomain]) {
+        domainDataUsage[initiatorDomain] = { totalSize: 0, tabs: {} };
+    }
+
+    if (tabId !== -1) {
+        try {
+            const tab = await chrome.tabs.get(tabId);
+            if (tab) {
+                if (!domainDataUsage[initiatorDomain].tabs[tabId]) {
+                    domainDataUsage[initiatorDomain].tabs[tabId] = { totalSize: 0, title: tab.title };
+                }
+                domainDataUsage[initiatorDomain].tabs[tabId].totalSize += size;
+                domainDataUsage[initiatorDomain].tabs[tabId].title = tab.title;
+            }
+        } catch (e) {
+            // Tab may have been closed
+        }
+    }
+
+    domainDataUsage[initiatorDomain].totalSize += size;
+    isDirty = true;
 
     chrome.tabs.get(tabId, (tab) => {
         if (tab && !tab.active) {
