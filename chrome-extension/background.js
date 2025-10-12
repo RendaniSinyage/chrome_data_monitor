@@ -1,5 +1,6 @@
 // --- Data and State Management ---
 const domainDataUsage = {};
+const serviceUsageMap = {};
 const backgroundActivity = {};
 let isDirty = false;
 
@@ -13,16 +14,30 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 async function loadInitialData() {
-    const result = await chrome.storage.local.get('dataUsage');
+    const result = await chrome.storage.local.get(['dataUsage', 'serviceUsageMap']);
     if (result.dataUsage) {
         Object.assign(domainDataUsage, result.dataUsage);
+    }
+    if (result.serviceUsageMap) {
+        // Reconstruct the Sets from the stored arrays
+        for (const service in result.serviceUsageMap) {
+            serviceUsageMap[service] = new Set(result.serviceUsageMap[service]);
+        }
     }
 }
 
 // --- Throttled Data Saving ---
 async function saveData() {
     if (isDirty) {
-        await chrome.storage.local.set({ dataUsage: domainDataUsage });
+        // Convert Sets to arrays for JSON serialization
+        const serializableServiceUsageMap = {};
+        for (const service in serviceUsageMap) {
+            serializableServiceUsageMap[service] = Array.from(serviceUsageMap[service]);
+        }
+        await chrome.storage.local.set({
+            dataUsage: domainDataUsage,
+            serviceUsageMap: serializableServiceUsageMap
+        });
         isDirty = false;
     }
 }
@@ -92,18 +107,32 @@ chrome.webRequest.onCompleted.addListener(
             });
             if (tab && tab.url) {
                 initiatorDomain = new URL(tab.url).hostname;
+                // If the request is for a different domain, map the service to the initiator
+                if (initiatorDomain !== requestDomain) {
+                    if (!serviceUsageMap[requestDomain]) {
+                        serviceUsageMap[requestDomain] = new Set();
+                    }
+                    serviceUsageMap[requestDomain].add(initiatorDomain);
+                }
             }
         } catch (e) {
             // Tab might be closed, fall back to other methods
         }
     }
 
-    // Fallback to using the initiator property
+    // Fallback for background requests or when tab info is unavailable
     if (!initiatorDomain) {
-        try {
-            initiatorDomain = initiator ? new URL(initiator).hostname : requestDomain;
-        } catch (e) {
-            initiatorDomain = requestDomain;
+        const users = serviceUsageMap[requestDomain];
+        if (users && users.size === 1) {
+            // If one site uses this service, attribute the data to that site
+            initiatorDomain = Array.from(users)[0];
+        } else {
+            // Otherwise, attribute to the service itself or the request's origin
+            try {
+                initiatorDomain = initiator ? new URL(initiator).hostname : requestDomain;
+            } catch (e) {
+                initiatorDomain = requestDomain;
+            }
         }
     }
 

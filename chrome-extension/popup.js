@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Rendering Logic ---
-    function renderSites(dataUsage, pausedDomains, tabCounts) {
+    function renderSites(dataUsage, pausedDomains, tabCounts, serviceUsageMap) {
         sitesContainer.innerHTML = '';
         loadingMessageEl.style.display = 'none';
 
@@ -35,13 +35,14 @@ document.addEventListener('DOMContentLoaded', () => {
             totalBytes += usage;
             const isPaused = pausedDomains.includes(domain);
             const tabCount = tabCounts[domain] || 0;
-            createSiteEntry(domain, usage, isPaused, tabCount);
+            const serviceUsers = serviceUsageMap[domain] ? serviceUsageMap[domain].length : 0;
+            createSiteEntry(domain, usage, isPaused, tabCount, serviceUsers);
         }
 
         totalUsageEl.textContent = formatBytes(totalBytes);
     }
 
-    function createSiteEntry(domain, usage, isPaused, tabCount) {
+    function createSiteEntry(domain, usage, isPaused, tabCount, serviceUsers) {
         const siteEntry = document.createElement('div');
         siteEntry.className = 'site-entry';
         if (isPaused) {
@@ -69,6 +70,13 @@ document.addEventListener('DOMContentLoaded', () => {
         siteInfo.appendChild(siteDomain);
         siteInfo.appendChild(siteUsage);
 
+        if (serviceUsers > 1) {
+            const serviceInfo = document.createElement('div');
+            serviceInfo.className = 'service-info';
+            serviceInfo.textContent = `Used by ${serviceUsers} sites`;
+            siteInfo.appendChild(serviceInfo);
+        }
+
         const siteControls = document.createElement('div');
         siteControls.className = 'site-controls';
 
@@ -90,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Data Fetching and Updates ---
     async function updateUI() {
         const [storageData, tabs] = await Promise.all([
-            chrome.storage.local.get(['dataUsage', 'pausedDomains']),
+            chrome.storage.local.get(['dataUsage', 'pausedDomains', 'serviceUsageMap']),
             chrome.tabs.query({})
         ]);
 
@@ -104,7 +112,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        renderSites(storageData.dataUsage || {}, storageData.pausedDomains || [], tabCounts);
+        renderSites(
+            storageData.dataUsage || {},
+            storageData.pausedDomains || [],
+            tabCounts,
+            storageData.serviceUsageMap || {}
+        );
     }
 
     // --- Event Listeners ---
