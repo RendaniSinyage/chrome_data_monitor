@@ -11,6 +11,7 @@ chrome.runtime.onInstalled.addListener(() => {
     loadInitialData();
     chrome.alarms.create('dataSaver', { periodInMinutes: 1 / 30 }); // Save every 2 seconds
     chrome.alarms.create('backgroundActivityChecker', { periodInMinutes: 1 });
+    chrome.alarms.create('dailyResetChecker', { periodInMinutes: 60 * 24 }); // Check once a day
 });
 
 async function loadInitialData() {
@@ -228,7 +229,17 @@ chrome.tabs.onActivated.addListener(activeInfo => {
     });
 });
 
-chrome.alarms.onAlarm.addListener(alarm => {
+async function clearData() {
+    Object.keys(domainDataUsage).forEach(key => delete domainDataUsage[key]);
+    Object.keys(serviceUsageMap).forEach(key => delete serviceUsageMap[key]);
+    await chrome.storage.local.remove(['dataUsage', 'serviceUsageMap']);
+    await chrome.storage.local.set({ lastResetDate: new Date().toISOString() });
+    isDirty = false;
+    // Trigger UI update
+    await chrome.storage.local.set({ dataUsage: {} });
+}
+
+chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (alarm.name === 'dataSaver') {
         saveData();
     } else if (alarm.name === 'backgroundActivityChecker') {
@@ -237,6 +248,20 @@ chrome.alarms.onAlarm.addListener(alarm => {
             if (now - backgroundActivity[domain].firstRequestTime > 300000) {
                 chrome.notifications.create(`proactive-pause-${domain}`, { type: 'basic', iconUrl: 'icon.png', title: 'Background Activity Detected', message: `The site "${domain}" has been using data in the background for over 5 minutes. Would you like to pause it?`, buttons: [{ title: 'Pause Site' }]});
                 delete backgroundActivity[domain];
+            }
+        }
+    } else if (alarm.name === 'dailyResetChecker') {
+        const { settings } = await chrome.storage.local.get('settings');
+        if (settings && settings.resetDay && settings.resetPeriod) {
+            const { lastResetDate } = await chrome.storage.local.get('lastResetDate');
+            const lastReset = lastResetDate ? new Date(lastResetDate) : new Date(0);
+            const now = new Date();
+            const daysSinceReset = (now - lastReset) / (1000 * 60 * 60 * 24);
+
+            if (daysSinceReset >= settings.resetPeriod) {
+                if (now.getDate() === settings.resetDay) {
+                    await clearData();
+                }
             }
         }
     }

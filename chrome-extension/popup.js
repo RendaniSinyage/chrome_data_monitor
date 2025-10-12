@@ -2,6 +2,48 @@ document.addEventListener('DOMContentLoaded', () => {
     const sitesContainer = document.getElementById('sites-container');
     const totalUsageEl = document.getElementById('total-usage');
     const loadingMessageEl = document.getElementById('loading-message');
+    const tabLinks = document.querySelectorAll('.tab-link');
+    const tabContents = document.querySelectorAll('.tab-content');
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsView = document.getElementById('settings-view');
+    const saveSettingsBtn = document.getElementById('save-settings-btn');
+    const resetDayInput = document.getElementById('reset-day');
+    const resetPeriodSelect = document.getElementById('reset-period');
+
+    // --- Settings Logic ---
+    settingsBtn.addEventListener('click', () => {
+        settingsView.classList.toggle('hidden');
+    });
+
+    saveSettingsBtn.addEventListener('click', () => {
+        const settings = {
+            resetDay: parseInt(resetDayInput.value, 10),
+            resetPeriod: parseInt(resetPeriodSelect.value, 10)
+        };
+        chrome.storage.local.set({ settings });
+        settingsView.classList.add('hidden');
+    });
+
+    async function loadSettings() {
+        const { settings } = await chrome.storage.local.get('settings');
+        if (settings) {
+            resetDayInput.value = settings.resetDay;
+            resetPeriodSelect.value = settings.resetPeriod;
+        }
+    }
+
+    // --- Tab Switching Logic ---
+    tabLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            const tabId = link.dataset.tab;
+
+            tabLinks.forEach(l => l.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+
+            link.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        });
+    });
 
     // --- Utility Functions ---
     function formatBytes(bytes) {
@@ -13,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Rendering Logic ---
-    function renderSites(dataUsage, pausedDomains, tabCounts, serviceUsageMap) {
+    function renderSites(dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs) {
         sitesContainer.innerHTML = '';
         loadingMessageEl.style.display = 'none';
 
@@ -36,13 +78,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const isPaused = pausedDomains.includes(domain);
             const tabCount = tabCounts[domain] || 0;
             const serviceUsers = serviceUsageMap[domain] ? serviceUsageMap[domain].length : 0;
-            createSiteEntry(domain, usage, isPaused, tabCount, serviceUsers);
+            const singleTabInfo = singleTabs[domain];
+            createSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo);
         }
 
         totalUsageEl.textContent = formatBytes(totalBytes);
     }
 
-    function createSiteEntry(domain, usage, isPaused, tabCount, serviceUsers) {
+    function createSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo) {
         const siteEntry = document.createElement('div');
         siteEntry.className = 'site-entry';
         if (isPaused) {
@@ -60,6 +103,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const tabCountEl = document.createElement('span');
             tabCountEl.className = 'tab-count';
             tabCountEl.textContent = `${tabCount} tab${tabCount > 1 ? 's' : ''}`;
+
+            if (singleTabInfo) {
+                tabCountEl.classList.add('clickable');
+                tabCountEl.addEventListener('click', () => {
+                    chrome.windows.update(singleTabInfo.windowId, { focused: true });
+                    chrome.tabs.update(singleTabInfo.tabId, { active: true });
+                });
+            }
             siteDomain.appendChild(tabCountEl);
         }
 
@@ -97,18 +148,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Data Fetching and Updates ---
     async function updateUI() {
+        loadingMessageEl.style.display = 'block';
+        sitesContainer.innerHTML = '';
+
         const [storageData, tabs] = await Promise.all([
             chrome.storage.local.get(['dataUsage', 'pausedDomains', 'serviceUsageMap']),
             chrome.tabs.query({})
         ]);
 
         const tabCounts = {};
+        const singleTabs = {};
+        const domainToTabMap = {};
+
         for (const tab of tabs) {
             try {
                 const domain = new URL(tab.url).hostname;
-                tabCounts[domain] = (tabCounts[domain] || 0) + 1;
+                if (!domainToTabMap[domain]) {
+                    domainToTabMap[domain] = [];
+                }
+                domainToTabMap[domain].push({ tabId: tab.id, windowId: tab.windowId });
             } catch (e) {
                 // Ignore invalid URLs
+            }
+        }
+
+        for (const domain in domainToTabMap) {
+            const domainTabs = domainToTabMap[domain];
+            tabCounts[domain] = domainTabs.length;
+            if (domainTabs.length === 1) {
+                singleTabs[domain] = domainTabs[0];
             }
         }
 
@@ -116,7 +184,8 @@ document.addEventListener('DOMContentLoaded', () => {
             storageData.dataUsage || {},
             storageData.pausedDomains || [],
             tabCounts,
-            storageData.serviceUsageMap || {}
+            storageData.serviceUsageMap || {},
+            singleTabs
         );
     }
 
@@ -129,4 +198,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial Load
     updateUI();
+    loadSettings();
 });

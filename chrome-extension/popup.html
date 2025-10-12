@@ -6,11 +6,49 @@
 </head>
 <body>
     <div class="header-container">
-        <h1>Data Usage</h1>
-        <div id="total-usage"></div>
+        <h1>Data Tracker</h1>
+        <div id="total-usage-container">
+            <span id="total-usage"></span>
+            <button id="settings-btn" class="icon-btn">
+                <img src="icon.png" alt="Settings" />
+            </button>
+        </div>
     </div>
-    <div id="loading-message">Loading data...</div>
-    <div id="sites-container"></div>
+
+    <div class="tab-container">
+        <button class="tab-link active" data-tab="data-usage-tab">Data Usage</button>
+        <button class="tab-link" data-tab="about-tab">About</button>
+    </div>
+
+    <div id="data-usage-tab" class="tab-content active">
+        <div id="settings-view" class="hidden">
+            <h3>Reset Data Settings</h3>
+            <div class="setting-row">
+                <label for="reset-day">Reset on day:</label>
+                <input type="number" id="reset-day" min="1" max="31">
+            </div>
+            <div class="setting-row">
+                <label for="reset-period">Reset every:</label>
+                <select id="reset-period">
+                    <option value="7">7 days</option>
+                    <option value="14">14 days</option>
+                    <option value="30" selected>30 days</option>
+                </select>
+            </div>
+            <button id="save-settings-btn">Save</button>
+        </div>
+        <div id="loading-message">Loading data...</div>
+        <div id="sites-container"></div>
+    </div>
+
+    <div id="about-tab" class="tab-content">
+        <div class="about-content">
+            <h2>About Data Tracker</h2>
+            <p>Authored by ROKCT Holdings.</p>
+            <p>The purpose of this extension is to help you monitor your data usage and claim control back.</p>
+        </div>
+    </div>
+
     <script src="popup.js"></script>
 </body>
 </html>
