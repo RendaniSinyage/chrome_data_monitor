@@ -35,8 +35,10 @@ async function saveData() {
         for (const service in serviceUsageMap) {
             serializableServiceUsageMap[service] = Array.from(serviceUsageMap[service]);
         }
+        // Create a deep copy to ensure `oldValue` and `newValue` are different in the onChanged listener
+        const dataUsageCopy = JSON.parse(JSON.stringify(domainDataUsage));
         await chrome.storage.local.set({
-            dataUsage: domainDataUsage,
+            dataUsage: dataUsageCopy,
             serviceUsageMap: serializableServiceUsageMap
         });
         isDirty = false;
