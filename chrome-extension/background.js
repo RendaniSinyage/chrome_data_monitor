@@ -79,12 +79,32 @@ chrome.webRequest.onCompleted.addListener(
     const requestDomain = new URL(url).hostname;
 
     let initiatorDomain;
-    try {
-        // Use the initiator if it exists, otherwise fall back to the request's own domain
-        initiatorDomain = initiator ? new URL(initiator).hostname : requestDomain;
-    } catch (e) {
-        // If initiator is not a valid URL (e.g., "null"), fall back to the request domain
-        initiatorDomain = requestDomain;
+    // Prioritize getting the initiator from the tab URL for accuracy
+    if (tabId !== -1) {
+        try {
+            const tab = await new Promise((resolve, reject) => {
+                chrome.tabs.get(tabId, (tab) => {
+                    if (chrome.runtime.lastError) {
+                        return reject(chrome.runtime.lastError);
+                    }
+                    resolve(tab);
+                });
+            });
+            if (tab && tab.url) {
+                initiatorDomain = new URL(tab.url).hostname;
+            }
+        } catch (e) {
+            // Tab might be closed, fall back to other methods
+        }
+    }
+
+    // Fallback to using the initiator property
+    if (!initiatorDomain) {
+        try {
+            initiatorDomain = initiator ? new URL(initiator).hostname : requestDomain;
+        } catch (e) {
+            initiatorDomain = requestDomain;
+        }
     }
 
     // Ignore requests initiated by the extension itself
