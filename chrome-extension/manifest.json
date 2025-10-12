@@ -17,7 +17,9 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": "icon.svg",
+    "default_title": "Data Tracker"
   },
   "host_permissions": [
     "<all_urls>"

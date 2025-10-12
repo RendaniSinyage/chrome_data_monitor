@@ -35,7 +35,6 @@ async function saveData() {
         for (const service in serviceUsageMap) {
             serializableServiceUsageMap[service] = Array.from(serviceUsageMap[service]);
         }
-        // Create a deep copy to ensure `oldValue` and `newValue` are different in the onChanged listener
         const dataUsageCopy = JSON.parse(JSON.stringify(domainDataUsage));
         await chrome.storage.local.set({
             dataUsage: dataUsageCopy,
@@ -320,10 +319,27 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         }
     } else if (alarm.name === 'dailyResetChecker') {
         const { settings } = await chrome.storage.local.get('settings');
+        const now = new Date();
+
+        if (now.getDate() === 1) {
+            const lastMonthDate = new Date(now);
+            lastMonthDate.setDate(0);
+            const lastMonthYear = lastMonthDate.getFullYear();
+            const lastMonth = lastMonthDate.getMonth();
+            const snapshotKey = `dataUsage_${lastMonthYear}-${lastMonth + 1}`;
+
+            const dataToSave = JSON.parse(JSON.stringify(domainDataUsage));
+            chrome.storage.local.set({ [snapshotKey]: dataToSave }, () => {
+                // After saving the snapshot, clear the current data for the new month.
+                Object.keys(domainDataUsage).forEach(key => delete domainDataUsage[key]);
+                isDirty = true;
+                saveData();
+            });
+        }
+
         if (settings && settings.resetDay && settings.resetPeriod) {
             const { lastResetDate } = await chrome.storage.local.get('lastResetDate');
             const lastReset = lastResetDate ? new Date(lastResetDate) : new Date(0);
-            const now = new Date();
             const daysSinceReset = (now - lastReset) / (1000 * 60 * 60 * 24);
 
             if (daysSinceReset >= settings.resetPeriod) {

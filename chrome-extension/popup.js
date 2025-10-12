@@ -126,7 +126,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (lowUsageSites.length > 0) {
+            // Always show the compacted entry if there are any low-usage sites,
+            // even if there are no high-usage sites.
             createCompactedEntry(lowUsageSites, lowUsageTotal, dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings);
+        } else if (highUsageSites.length === 0 && allDomains.size > 0) {
+            // This case handles when there are sites, but they are all below the threshold.
+            // In the original code, this would result in a blank screen.
+            createCompactedEntry(sortedDomains, totalBytes, dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings);
         }
 
         totalUsageEl.textContent = formatBytes(totalBytes);
@@ -254,9 +260,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const header = document.createElement('div');
         header.className = 'header';
-        header.textContent = `Low-usage sites (${sites.length}) - ${formatBytes(totalUsage)}`;
+        const headerText = `Low-usage sites (${sites.length}) - ${formatBytes(totalUsage)}`;
+        header.textContent = headerText;
+
+        const hr = document.createElement('hr');
+        hr.style.display = 'none';
+        compactedEntry.appendChild(hr);
+
         header.addEventListener('click', () => {
             compactedEntry.classList.toggle('expanded');
+            hr.style.display = compactedEntry.classList.contains('expanded') ? 'block' : 'none';
+            header.textContent = compactedEntry.classList.contains('expanded') ? '' : headerText;
         });
         compactedEntry.appendChild(header);
 
@@ -273,26 +287,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         compactedEntry.appendChild(details);
         sitesContainer.appendChild(compactedEntry);
-    }
-
-    // --- Rendering Logic (Optimized) ---
-    function updateNumbers(dataUsage) {
-        let totalBytes = 0;
-        const allDomains = new Set(Object.keys(dataUsage));
-
-        for (const domain of allDomains) {
-            const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
-            totalBytes += usage;
-
-            const siteEntry = sitesContainer.querySelector(`.site-entry[data-domain="${domain}"]`);
-            if (siteEntry) {
-                const usageEl = siteEntry.querySelector('.site-usage');
-                if (usageEl) {
-                    usageEl.textContent = formatBytes(usage);
-                }
-            }
-        }
-        totalUsageEl.textContent = formatBytes(totalBytes);
     }
 
     // --- Data Fetching and Updates ---
@@ -364,6 +358,25 @@ document.addEventListener('DOMContentLoaded', () => {
         return false; // No structural changes, only numbers need updating
     }
 
+    function updateNumbers(dataUsage) {
+        let totalBytes = 0;
+        const allDomains = new Set(Object.keys(dataUsage));
+
+        for (const domain of allDomains) {
+            const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
+            totalBytes += usage;
+
+            const siteEntry = sitesContainer.querySelector(`.site-entry[data-domain="${domain}"]`);
+            if (siteEntry) {
+                const usageEl = siteEntry.querySelector('.site-usage');
+                if (usageEl) {
+                    usageEl.textContent = formatBytes(usage);
+                }
+            }
+        }
+        totalUsageEl.textContent = formatBytes(totalBytes);
+    }
+
     chrome.storage.onChanged.addListener((changes, namespace) => {
         if (namespace !== 'local') return;
 
@@ -388,6 +401,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const versionNumberEl = document.getElementById('version-number');
     versionNumberEl.textContent = chrome.runtime.getManifest().version;
 
+    const browserVersionEl = document.getElementById('browser-version');
+    if (chrome.runtime.getBrowserInfo) {
+        chrome.runtime.getBrowserInfo((info) => {
+            browserVersionEl.textContent = `${info.name} ${info.version}`;
+        });
+    } else {
+        // Fallback for browsers that don't support getBrowserInfo
+        const userAgent = navigator.userAgent;
+        let browserName = "Unknown";
+        let browserVersion = "Unknown";
+
+        if (userAgent.indexOf("Firefox") > -1) {
+            browserName = "Firefox";
+            browserVersion = userAgent.substring(userAgent.indexOf("Firefox") + 8);
+        } else if (userAgent.indexOf("Opera") > -1 || userAgent.indexOf("OPR") > -1) {
+            browserName = "Opera";
+            browserVersion = userAgent.substring(userAgent.indexOf("Opera") + 6);
+            if (userAgent.indexOf("Version") > -1) {
+                browserVersion = userAgent.substring(userAgent.indexOf("Version") + 8);
+            }
+        } else if (userAgent.indexOf("Trident") > -1) {
+            browserName = "Internet Explorer";
+            browserVersion = userAgent.substring(userAgent.indexOf("rv:") + 3);
+        } else if (userAgent.indexOf("Edge") > -1) {
+            browserName = "Edge";
+            browserVersion = userAgent.substring(userAgent.indexOf("Edge") + 5);
+        } else if (userAgent.indexOf("Chrome") > -1) {
+            browserName = "Chrome";
+            browserVersion = userAgent.substring(userAgent.indexOf("Chrome") + 7);
+        } else if (userAgent.indexOf("Safari") > -1) {
+            browserName = "Safari";
+            browserVersion = userAgent.substring(userAgent.indexOf("Version") + 8);
+        }
+
+        browserVersion = browserVersion.split(" ")[0];
+        browserVersionEl.textContent = `${browserName} ${browserVersion}`;
+    }
+
     const clearDataBtn = document.getElementById('clear-data-btn');
     clearDataBtn.addEventListener('click', () => {
         if (confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
@@ -398,4 +449,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial Load
     updateUI();
     loadSettings();
+    loadMonthlyComparison();
+
+    async function loadMonthlyComparison() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth(); // 0-indexed
+
+        const lastMonthDate = new Date(now);
+        lastMonthDate.setDate(0);
+        const lastMonthYear = lastMonthDate.getFullYear();
+        const lastMonth = lastMonthDate.getMonth();
+
+        const lastMonthKey = `dataUsage_${lastMonthYear}-${lastMonth + 1}`;
+
+        const { [lastMonthKey]: lastMonthData, dataUsage } = await chrome.storage.local.get([lastMonthKey, 'dataUsage']);
+
+        const calculateTotalUsage = (data) => {
+            if (!data) return 0;
+            return Object.values(data).reduce((total, domain) => total + domain.totalSize, 0);
+        };
+
+        const currentMonthUsage = calculateTotalUsage(dataUsage);
+        const lastMonthUsage = calculateTotalUsage(lastMonthData);
+
+        document.getElementById('current-month-usage').textContent = formatBytes(currentMonthUsage);
+        document.getElementById('last-month-usage').textContent = formatBytes(lastMonthUsage);
+    }
 });
