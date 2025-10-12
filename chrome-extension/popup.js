@@ -417,8 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 resetPeriod: 30 // Default to 30 days
             };
             chrome.storage.local.set({ settings, isSetupComplete: true }, () => {
-                setupView.classList.add('hidden');
-                mainView.classList.remove('hidden');
+                document.body.classList.remove('setup');
                 initializeMainView();
             });
         }
@@ -427,12 +426,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function checkSetup() {
         const { isSetupComplete } = await chrome.storage.local.get('isSetupComplete');
         if (isSetupComplete) {
-            setupView.classList.add('hidden');
-            mainView.classList.remove('hidden');
+            document.body.classList.remove('setup');
             initializeMainView();
         } else {
-            setupView.classList.remove('hidden');
-            mainView.classList.add('hidden');
+            document.body.classList.add('setup');
             generateSetupCalendar(null);
         }
     }

@@ -412,6 +412,10 @@ h1 {
     background-color: #2980b9;
 }
 
-#main-view.hidden {
+body.setup #main-view {
+    display: none;
+}
+
+body:not(.setup) #setup-view {
     display: none;
 }

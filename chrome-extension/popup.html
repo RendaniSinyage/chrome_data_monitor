@@ -28,30 +28,29 @@
             <button class="tab-link active" data-tab="data-usage-tab">Data Usage</button>
             <button class="tab-link" data-tab="about-tab">About</button>
         </div>
-    </div>
 
-    <div id="data-usage-tab" class="tab-content active">
-        <div id="settings-view" class="hidden">
-            <h3>Reset Data Settings</h3>
-            <div class="setting-row">
-                <label>Reset on day:</label>
-                <div id="calendar-container"></div>
+        <div id="data-usage-tab" class="tab-content active">
+            <div id="settings-view" class="hidden">
+                <h3>Reset Data Settings</h3>
+                <div class="setting-row">
+                    <label>Reset on day:</label>
+                    <div id="calendar-container"></div>
+                </div>
+                <div class="setting-row">
+                    <label for="reset-period">Reset every:</label>
+                    <select id="reset-period">
+                        <option value="7">7 days</option>
+                        <option value="14">14 days</option>
+                        <option value="30" selected>30 days</option>
+                    </select>
+                </div>
+                <button id="save-settings-btn">Save</button>
             </div>
-            <div class="setting-row">
-                <label for="reset-period">Reset every:</label>
-                <select id="reset-period">
-                    <option value="7">7 days</option>
-                    <option value="14">14 days</option>
-                    <option value="30" selected>30 days</option>
-                </select>
-            </div>
-            <button id="save-settings-btn">Save</button>
+            <div id="loading-message">Loading data...</div>
+            <div id="sites-container"></div>
         </div>
-        <div id="loading-message">Loading data...</div>
-        <div id="sites-container"></div>
-    </div>
 
-    <div id="about-tab" class="tab-content">
+        <div id="about-tab" class="tab-content">
         <div class="about-content">
             <h2>About Data Tracker</h2>
             <p>Authored by ROKCT Holdings.</p>
