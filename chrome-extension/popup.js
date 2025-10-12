@@ -12,8 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedResetDay = null;
 
     // --- Calendar Logic ---
-    function generateCalendar(selectedDay) {
-        calendarContainer.innerHTML = '';
+    function generateCalendar(container, selectedDay, callback) {
+        container.innerHTML = '';
         for (let i = 1; i <= 31; i++) {
             const dayEl = document.createElement('div');
             dayEl.className = 'calendar-day';
@@ -22,10 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 dayEl.classList.add('selected');
             }
             dayEl.addEventListener('click', () => {
-                selectedResetDay = i;
-                generateCalendar(i);
+                callback(i);
             });
-            calendarContainer.appendChild(dayEl);
+            container.appendChild(dayEl);
         }
     }
 
@@ -49,7 +48,10 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedResetDay = settings.resetDay;
             resetPeriodSelect.value = settings.resetPeriod;
         }
-        generateCalendar(selectedResetDay);
+        generateCalendar(calendarContainer, selectedResetDay, (day) => {
+            selectedResetDay = day;
+            generateCalendar(calendarContainer, day, () => {});
+        });
     }
 
     // --- Tab Switching Logic ---
@@ -93,21 +95,24 @@ document.addEventListener('DOMContentLoaded', () => {
             return usageB - usageA;
         });
 
-        const topSites = sortedDomains.slice(0, 3);
-        const otherSites = sortedDomains.slice(3);
-        let otherSitesTotal = 0;
+        const highUsageSites = [];
+        const lowUsageSites = [];
+        let lowUsageTotal = 0;
+        const LOW_USAGE_THRESHOLD = 10 * 1024 * 1024; // 10MB
 
         let totalBytes = 0;
         for (const domain of sortedDomains) {
             const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
             totalBytes += usage;
+            if (usage < LOW_USAGE_THRESHOLD) {
+                lowUsageSites.push(domain);
+                lowUsageTotal += usage;
+            } else {
+                highUsageSites.push(domain);
+            }
         }
 
-        for (const domain of otherSites) {
-            otherSitesTotal += dataUsage[domain] ? dataUsage[domain].totalSize : 0;
-        }
-
-        for (const domain of topSites) {
+        for (const domain of highUsageSites) {
             const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
             const isPaused = pausedDomains.includes(domain);
             const tabCount = tabCounts[domain] || 0;
@@ -117,8 +122,8 @@ document.addEventListener('DOMContentLoaded', () => {
             sitesContainer.appendChild(siteEntry);
         }
 
-        if (otherSites.length > 0) {
-            createCompactedEntry(otherSites, otherSitesTotal, dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings);
+        if (lowUsageSites.length > 0) {
+            createCompactedEntry(lowUsageSites, lowUsageTotal, dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings);
         }
 
         totalUsageEl.textContent = formatBytes(totalBytes);
@@ -312,7 +317,59 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- Setup Flow ---
+    const setupView = document.getElementById('setup-view');
+    const mainView = document.getElementById('main-view');
+    const setupCalendarContainer = document.getElementById('setup-calendar-container');
+    const saveSetupBtn = document.getElementById('save-setup-btn');
+    let setupSelectedResetDay = null;
+
+    function generateSetupCalendar(selectedDay) {
+        setupCalendarContainer.innerHTML = '';
+        for (let i = 1; i <= 31; i++) {
+            const dayEl = document.createElement('div');
+            dayEl.className = 'calendar-day';
+            dayEl.textContent = i;
+            if (i === selectedDay) {
+                dayEl.classList.add('selected');
+            }
+            dayEl.addEventListener('click', () => {
+                setupSelectedResetDay = i;
+                generateSetupCalendar(i);
+            });
+            setupCalendarContainer.appendChild(dayEl);
+        }
+    }
+
+    saveSetupBtn.addEventListener('click', () => {
+        if (setupSelectedResetDay) {
+            const settings = {
+                resetDay: setupSelectedResetDay,
+                resetPeriod: 30 // Default to 30 days
+            };
+            chrome.storage.local.set({ settings, isSetupComplete: true }, () => {
+                document.body.classList.remove('setup');
+                initializeMainView();
+            });
+        }
+    });
+
+    async function checkSetup() {
+        const { isSetupComplete } = await chrome.storage.local.get('isSetupComplete');
+        if (isSetupComplete) {
+            document.body.classList.remove('setup');
+            initializeMainView();
+        } else {
+            document.body.classList.add('setup');
+            generateSetupCalendar(null);
+        }
+    }
+
+    function initializeMainView() {
+        updateUI();
+        loadSettings();
+    }
+
     // Initial Load
-    updateUI();
-    loadSettings();
+    checkSetup();
 });
