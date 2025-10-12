@@ -8,7 +8,7 @@
     <div class="header-container">
         <h1>Data Tracker</h1>
         <div id="total-usage-container">
-            <span id="total-usage">-- MB</span>
+            <span id="total-usage"></span>
             <span id="last-month-comparison" class="comparison-text"></span>
             <button id="settings-btn" class="icon-btn" title="Settings">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path fill="none" d="M0 0h24v24H0z"/><path d="M12 1l9.5 5.5v11L12 23l-9.5-5.5v-11L12 1zm0 2.311L4.5 7.653v8.694l7.5 4.342 7.5-4.342V7.653L12 3.311zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
@@ -28,35 +28,36 @@
             <button class="tab-link active" data-tab="data-usage-tab">Data Usage</button>
             <button class="tab-link" data-tab="about-tab">About</button>
         </div>
+    </div>
 
-        <div id="data-usage-tab" class="tab-content active">
-            <div id="settings-view" class="hidden">
-                <h3>Reset Data Settings</h3>
-                <div class="setting-row">
-                    <label>Reset on day:</label>
-                    <div id="calendar-container"></div>
-                </div>
-                <div class="setting-row">
-                    <label for="reset-period">Reset every:</label>
-                    <select id="reset-period">
-                        <option value="7">7 days</option>
-                        <option value="14">14 days</option>
-                        <option value="30" selected>30 days</option>
-                    </select>
-                </div>
-                <button id="save-settings-btn">Save</button>
+    <div id="data-usage-tab" class="tab-content active">
+        <div id="settings-view" class="hidden">
+            <h3>Reset Data Settings</h3>
+            <div class="setting-row">
+                <label>Reset on day:</label>
+                <div id="calendar-container"></div>
             </div>
-            <div id="loading-message">Loading data...</div>
-            <div id="sites-container"></div>
+            <div class="setting-row">
+                <label for="reset-period">Reset every:</label>
+                <select id="reset-period">
+                    <option value="7">7 days</option>
+                    <option value="14">14 days</option>
+                    <option value="30" selected>30 days</option>
+                </select>
+            </div>
+            <button id="save-settings-btn">Save</button>
         </div>
+        <div id="loading-message">Loading data...</div>
+        <div id="sites-container"></div>
+    </div>
 
-        <div id="about-tab" class="tab-content">
+    <div id="about-tab" class="tab-content">
         <div class="about-content">
             <h2>About Data Tracker</h2>
             <p>Authored by ROKCT Holdings.</p>
             <p>This extension helps you monitor your data usage and claim control back.</p>
-            <p>Version: <span id="version-number">--</span></p>
-            <p>Browser: <span id="browser-version">--</span></p>
+            <p>Version: <span id="version-number"></span></p>
+            <p>Browser: <span id="browser-version"></span></p>
             <button id="clear-data-btn" class="danger-btn">Clear All Data</button>
         </div>
     </div>

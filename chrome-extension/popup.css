@@ -380,6 +380,14 @@ h1 {
     margin-bottom: 10px;
 }
 
+body:not(.main-view-active) #main-view {
+    display: none;
+}
+
+body.main-view-active #setup-view {
+    display: none;
+}
+
 #setup-view {
     padding: 20px;
     text-align: center;
@@ -410,12 +418,4 @@ h1 {
 
 #save-setup-btn:hover {
     background-color: #2980b9;
-}
-
-body.setup #main-view {
-    display: none;
-}
-
-body:not(.setup) #setup-view {
-    display: none;
 }

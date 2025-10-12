@@ -98,10 +98,25 @@ document.addEventListener('DOMContentLoaded', () => {
             return usageB - usageA;
         });
 
+        const highUsageSites = [];
+        const lowUsageSites = [];
+        let lowUsageTotal = 0;
+        const LOW_USAGE_THRESHOLD = 10 * 1024 * 1024; // 10MB
+
         let totalBytes = 0;
         for (const domain of sortedDomains) {
             const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
             totalBytes += usage;
+            if (usage < LOW_USAGE_THRESHOLD) {
+                lowUsageSites.push(domain);
+                lowUsageTotal += usage;
+            } else {
+                highUsageSites.push(domain);
+            }
+        }
+
+        for (const domain of highUsageSites) {
+            const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
             const isPaused = pausedDomains.includes(domain);
             const tabCount = tabCounts[domain] || 0;
             const serviceUsers = serviceUsageMap[domain] ? serviceUsageMap[domain].size : 0;
@@ -110,13 +125,16 @@ document.addEventListener('DOMContentLoaded', () => {
             sitesContainer.appendChild(siteEntry);
         }
 
+        if (lowUsageSites.length > 0) {
+            createCompactedEntry(lowUsageSites, lowUsageTotal, dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings);
+        }
+
         totalUsageEl.textContent = formatBytes(totalBytes);
     }
 
     function createSingleSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo, autoPauseSettings) {
         const siteEntry = document.createElement('div');
         siteEntry.className = 'site-entry';
-        siteEntry.dataset.domain = domain; // Add data-domain attribute
         if (isPaused) {
             siteEntry.classList.add('paused');
         }
@@ -229,6 +247,33 @@ document.addEventListener('DOMContentLoaded', () => {
         return siteEntry;
     }
 
+    function createCompactedEntry(sites, totalUsage, dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings) {
+        const compactedEntry = document.createElement('div');
+        compactedEntry.className = 'site-entry compacted';
+
+        const header = document.createElement('div');
+        header.className = 'header';
+        header.textContent = `Low-usage sites (${sites.length}) - ${formatBytes(totalUsage)}`;
+        header.addEventListener('click', () => {
+            compactedEntry.classList.toggle('expanded');
+        });
+        compactedEntry.appendChild(header);
+
+        const details = document.createElement('div');
+        details.className = 'details';
+        for (const domain of sites) {
+            const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
+            const isPaused = pausedDomains.includes(domain);
+            const tabCount = tabCounts[domain] || 0;
+            const serviceUsers = serviceUsageMap[domain] ? serviceUsageMap[domain].size : 0;
+            const singleTabInfo = singleTabs[domain];
+            const siteEntry = createSingleSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo, autoPauseSettings);
+            details.appendChild(siteEntry);
+        }
+        compactedEntry.appendChild(details);
+        sitesContainer.appendChild(compactedEntry);
+    }
+
     // --- Data Fetching and Updates ---
     async function updateUI() {
         loadingMessageEl.style.display = 'block';
@@ -274,67 +319,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Event Listeners ---
-    function handleDataUsageChange(oldData, newData) {
-        const LOW_USAGE_THRESHOLD = 10 * 1024 * 1024; // 10MB
-        const oldKeys = Object.keys(oldData);
-        const newKeys = Object.keys(newData);
-
-        if (oldKeys.length !== newKeys.length) {
-            return true; // A site was added or removed, full redraw needed
-        }
-
-        for (const domain of newKeys) {
-            const oldUsage = oldData[domain] ? oldData[domain].totalSize : 0;
-            const newUsage = newData[domain] ? newData[domain].totalSize : 0;
-
-            const wasBelow = oldUsage < LOW_USAGE_THRESHOLD;
-            const isBelow = newUsage < LOW_USAGE_THRESHOLD;
-
-            if (wasBelow !== isBelow) {
-                return true; // A site crossed the threshold, full redraw needed
-            }
-        }
-
-        return false; // No structural changes, only numbers need updating
-    }
-
-    function updateNumbers(dataUsage) {
-        let totalBytes = 0;
-        const allDomains = new Set(Object.keys(dataUsage));
-
-        for (const domain of allDomains) {
-            const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
-            totalBytes += usage;
-
-            const siteEntry = sitesContainer.querySelector(`.site-entry[data-domain="${domain}"]`);
-            if (siteEntry) {
-                const usageEl = siteEntry.querySelector('.site-usage');
-                if (usageEl) {
-                    usageEl.textContent = formatBytes(usage);
-                }
-            }
-        }
-        totalUsageEl.textContent = formatBytes(totalBytes);
-    }
-
     chrome.storage.onChanged.addListener((changes, namespace) => {
-        if (namespace !== 'local') return;
-
-        if (changes.pausedDomains) {
-            updateUI(); // Always redraw for pause/unpause changes
-            return;
-        }
-
-        if (changes.dataUsage) {
-            const oldValue = changes.dataUsage.oldValue || {};
-            const newValue = changes.dataUsage.newValue || {};
-            const needsRedraw = handleDataUsageChange(oldValue, newValue);
-
-            if (needsRedraw) {
-                updateUI();
-            } else {
-                updateNumbers(newValue);
-            }
+        if (namespace === 'local' && (changes.dataUsage || changes.pausedDomains)) {
+            updateUI();
         }
     });
 
@@ -417,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 resetPeriod: 30 // Default to 30 days
             };
             chrome.storage.local.set({ settings, isSetupComplete: true }, () => {
-                document.body.classList.remove('setup');
+                document.body.classList.add('main-view-active');
                 initializeMainView();
             });
         }
@@ -426,10 +413,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function checkSetup() {
         const { isSetupComplete } = await chrome.storage.local.get('isSetupComplete');
         if (isSetupComplete) {
-            document.body.classList.remove('setup');
+            document.body.classList.add('main-view-active');
             initializeMainView();
         } else {
-            document.body.classList.add('setup');
             generateSetupCalendar(null);
         }
     }
