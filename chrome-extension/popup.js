@@ -276,6 +276,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Data Fetching and Updates ---
+    function renderTopTabs(dataUsage) {
+        const topTabsContainer = document.getElementById('top-tabs-container');
+        topTabsContainer.innerHTML = '';
+
+        const allTopTabs = [];
+
+        for (const domain in dataUsage) {
+            if (dataUsage[domain].tabs) {
+                const tabs = Object.values(dataUsage[domain].tabs);
+                if (tabs.length > 0) {
+                    const topTab = tabs.sort((a, b) => b.totalSize - a.totalSize)[0];
+                    allTopTabs.push({
+                        domain,
+                        title: topTab.title,
+                        usage: topTab.totalSize
+                    });
+                }
+            }
+        }
+
+        if (allTopTabs.length === 0) {
+            topTabsContainer.innerHTML = '<div class="site-entry"><div class="site-info">No tab data tracked yet.</div></div>';
+            return;
+        }
+
+        allTopTabs.sort((a, b) => b.usage - a.usage);
+
+        for (const tab of allTopTabs) {
+            const tabEntry = document.createElement('div');
+            tabEntry.className = 'site-entry';
+
+            const tabInfo = document.createElement('div');
+            tabInfo.className = 'site-info';
+
+            const tabTitle = document.createElement('div');
+            tabTitle.className = 'site-domain';
+            tabTitle.textContent = tab.title;
+
+            const tabUsage = document.createElement('div');
+            tabUsage.className = 'site-usage';
+            tabUsage.textContent = formatBytes(tab.usage);
+
+            tabInfo.appendChild(tabTitle);
+            tabInfo.appendChild(tabUsage);
+            tabEntry.appendChild(tabInfo);
+            topTabsContainer.appendChild(tabEntry);
+        }
+    }
+
     async function updateUI() {
         loadingMessageEl.style.display = 'block';
         sitesContainer.innerHTML = '';
@@ -317,6 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
             singleTabs,
             storageData.autoPauseSettings || {}
         );
+        renderTopTabs(storageData.dataUsage || {});
     }
 
     // --- Event Listeners ---

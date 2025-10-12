@@ -150,7 +150,7 @@ chrome.webRequest.onCompleted.addListener(
 
     // Initialize initiator data if it doesn't exist
     if (!domainDataUsage[initiatorDomain]) {
-      domainDataUsage[initiatorDomain] = { totalSize: 0, requests: {}, warned: false, paused: false };
+      domainDataUsage[initiatorDomain] = { totalSize: 0, tabs: {}, requests: {}, warned: false, paused: false };
     }
 
     // Initialize request data within the initiator if it doesn't exist
@@ -161,6 +161,29 @@ chrome.webRequest.onCompleted.addListener(
     // Accumulate sizes
     domainDataUsage[initiatorDomain].totalSize += size;
     domainDataUsage[initiatorDomain].requests[requestDomain].totalSize += size;
+
+    // Track per-tab usage
+    if (tabId !== -1) {
+        try {
+            const tab = await new Promise((resolve, reject) => {
+                chrome.tabs.get(tabId, (tab) => {
+                    if (chrome.runtime.lastError) {
+                        return reject(chrome.runtime.lastError);
+                    }
+                    resolve(tab);
+                });
+            });
+            if (tab) {
+                if (!domainDataUsage[initiatorDomain].tabs[tabId]) {
+                    domainDataUsage[initiatorDomain].tabs[tabId] = { totalSize: 0, title: tab.title };
+                }
+                domainDataUsage[initiatorDomain].tabs[tabId].totalSize += size;
+                domainDataUsage[initiatorDomain].tabs[tabId].title = tab.title; // Update title in case it changes
+            }
+        } catch (e) {
+            // Tab may have been closed
+        }
+    }
 
     const PAUSE_THRESHOLD = 1024 * 1024 * 1024;
     const WARNING_THRESHOLD = 500 * 1024 * 1024;
@@ -193,6 +216,16 @@ chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) =
             pauseDomain(notificationId.replace('pause-', ''));
         } else if (notificationId.startsWith('proactive-pause-')) {
             pauseDomain(notificationId.replace('proactive-pause-', ''));
+        }
+    }
+});
+
+chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+    // Remove closed tab's data from all domains
+    for (const domain in domainDataUsage) {
+        if (domainDataUsage[domain].tabs && domainDataUsage[domain].tabs[tabId]) {
+            delete domainDataUsage[domain].tabs[tabId];
+            isDirty = true;
         }
     }
 });
