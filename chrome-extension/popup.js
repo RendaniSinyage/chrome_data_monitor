@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const allDomains = new Set([...Object.keys(dataUsage || {}), ...Object.keys(pausedDomains || {})]);
 
         if (allDomains.size === 0) {
-            elements.sitesContainer.innerHTML = '<div class="site-entry"><div class="site-info">No data tracked yet.</div></div>';
+            elements.sitesContainer.innerHTML = '<div class="site-entry"><div class="site-info">No data tracked yet. Browse some sites to see usage.</div></div>';
             elements.totalUsage.textContent = 'Total: 0 B';
             return;
         }
@@ -238,15 +238,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             if (navigator.userAgentData) {
-                const uaData = await navigator.userAgentData.getHighEntropyValues(["platform", "platformVersion", "architecture", "model", "uaFullVersion"]);
+                const uaData = await navigator.userAgentData.getHighEntropyValues(["platform"]);
                 const brands = uaData.brands.filter(b => !b.brand.includes("Not"));
-                elements.browserVersion.textContent = `${brands.map(b => `${b.brand} ${b.version}`).join(', ')} on ${uaData.platform}`;
+                let browserName = 'Chromium-based';
+                if (brands.length > 0) {
+                    browserName = `${brands[0].brand} ${brands[0].version}`;
+                }
+                elements.browserVersion.textContent = `${browserName} on ${uaData.platform}`;
             } else {
                  const platform = await chrome.runtime.getPlatformInfo();
                  elements.browserVersion.textContent = `Chrome on ${platform.os}`;
             }
         } catch(e) {
-            elements.browserVersion.textContent = 'Browser info not available';
+            console.error("Could not determine browser version:", e);
+            elements.browserVersion.textContent = 'Info not available';
         }
 
         await loadSettings();

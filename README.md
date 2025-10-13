@@ -7,7 +7,6 @@ Data Tracker is a Chrome extension that helps you monitor your data usage and ta
 - **Real-time Data Tracking**: Monitors the data usage of each website in real-time.
 - **Detailed Usage Statistics**: Provides a breakdown of data usage by domain.
 - **Pause/Unpause Sites**: Temporarily block access to data-intensive websites to conserve data.
-- **Low-Usage Mode**: Compacts sites with low data usage into a single entry to keep the main view clean.
 - **Monthly Data Reset**: Automatically resets the data counter on a user-defined day of the month.
 - **Previous Month Comparison**: Displays a comparison of the current month's data usage with the previous month's.
 

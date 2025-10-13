@@ -109,7 +109,7 @@ chrome.webRequest.onCompleted.addListener(
             }
         } catch (e) {
             // Tab might be closed, this is a common case. Fallback to initiator.
-            if (chrome.runtime.lastError && chrome.runtime.lastError.message.includes('No tab with id')) {
+            if (chrome.runtime.lastError && (chrome.runtime.lastError.message.includes('No tab with id') || chrome.runtime.lastError.message.includes('Invalid tab ID'))) {
                 primaryDomain = initiator ? new URL(initiator).hostname : requestDomain;
             } else {
                 console.error(e);
