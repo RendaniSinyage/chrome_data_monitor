@@ -1,25 +1,19 @@
-# Credits and Attributions
+# Credits
 
-This project is built upon the work of several open-source projects and technologies. We are grateful to the creators and maintainers of these projects for their contributions to the open-source community.
-
-## Core Technologies
-
-*   **Chromium Project:** This extension is built using the WebExtension APIs, which are part of the Chromium project. The Chromium projects are developed and maintained by Google and a community of contributors.
-    *   **Website:** [https://www.chromium.org/](https://www.chromium.org/)
-
-*   **JavaScript:** The core logic of this extension is written in JavaScript. JavaScript is a programming language that conforms to the ECMAScript specification.
-    *   **Website:** [https://www.ecma-international.org/](https://www.ecma-international.org/)
+This extension was developed by ROKCT Holdings.
 
 ## Icons
 
-The icons used in this extension are from the **Remix Icon** library.
+The icon used in this extension is from the [Remix Icon](https://remixicon.com/) library, which is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
-- **Website:** [https://remixicon.com/](https://remixicon.com/)
-- **License:** Apache License 2.0
+- **Bar Chart Icon**: [remixicon-bar-chart-fill.svg](https://remixicon.com/icon/bar-chart-fill)
 
-Remix Icon is a set of open-source neutral-style system symbols for designers and developers. Thanks to the Remix Design team for creating and maintaining this excellent resource.
+## Libraries
 
-## Contributors
+This extension uses the following open-source libraries:
 
-- **ROKCT Holdings**
-- **Ray Thompson**
+- [Playwright](https://playwright.dev/) for testing.
+
+## Community
+
+Thank you to the open-source community for providing the tools and resources that made this project possible.

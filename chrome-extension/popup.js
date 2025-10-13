@@ -1,79 +1,88 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const sitesContainer = document.getElementById('sites-container');
-    const totalUsageEl = document.getElementById('total-usage');
-    const loadingMessageEl = document.getElementById('loading-message');
-    const tabLinks = document.querySelectorAll('.tab-link');
-    const tabContents = document.querySelectorAll('.tab-content');
-    const settingsBtn = document.getElementById('settings-btn');
-    const settingsView = document.getElementById('settings-view');
-    const saveSettingsBtn = document.getElementById('save-settings-btn');
-    const calendarContainer = document.getElementById('calendar-container');
-    const resetPeriodSelect = document.getElementById('reset-period');
-    let selectedResetDay = null;
+    // --- Element Cache ---
+    const elements = {
+        sitesContainer: document.getElementById('sites-container'),
+        totalUsage: document.getElementById('total-usage'),
+        lastMonthComparison: document.getElementById('last-month-comparison'),
+        loadingMessage: document.getElementById('loading-message'),
+        tabLinks: document.querySelectorAll('.tab-link'),
+        tabContents: document.querySelectorAll('.tab-content'),
+        settingsBtn: document.getElementById('settings-btn'),
+        settingsView: document.getElementById('settings-view'),
+        saveSettingsBtn: document.getElementById('save-settings-btn'),
+        calendarContainer: document.getElementById('calendar-container'),
+        resetPeriodSelect: document.getElementById('reset-period'),
+        versionNumber: document.getElementById('version-number'),
+        browserVersion: document.getElementById('browser-version'),
+        clearDataBtn: document.getElementById('clear-data-btn'),
+        setupView: document.getElementById('setup-view'),
+        mainView: document.getElementById('main-view'),
+        setupCalendarContainer: document.getElementById('setup-calendar-container'),
+        saveSetupBtn: document.getElementById('save-setup-btn'),
+    };
+
+    let selectedResetDay = 1;
 
     // --- Calendar Logic ---
-    function generateCalendar(container, selectedDay, callback) {
+    function generateCalendar(container, currentSelectedDay, onDaySelect) {
         container.innerHTML = '';
         for (let i = 1; i <= 31; i++) {
             const dayEl = document.createElement('div');
             dayEl.className = 'calendar-day';
             dayEl.textContent = i;
-            if (i === selectedDay) {
+            if (i === currentSelectedDay) {
                 dayEl.classList.add('selected');
             }
-            dayEl.addEventListener('click', () => {
-                callback(i);
-            });
+            dayEl.addEventListener('click', () => onDaySelect(i));
             container.appendChild(dayEl);
         }
     }
 
-    // --- Settings Logic ---
-    settingsBtn.addEventListener('click', () => {
-        settingsView.classList.toggle('hidden');
+    // --- Settings ---
+    elements.settingsBtn.addEventListener('click', () => {
+        elements.settingsView.classList.toggle('hidden');
     });
 
-    saveSettingsBtn.addEventListener('click', () => {
+    elements.saveSettingsBtn.addEventListener('click', () => {
         const settings = {
             resetDay: selectedResetDay,
-            resetPeriod: parseInt(resetPeriodSelect.value, 10)
+            resetPeriod: elements.resetPeriodSelect.value,
         };
-        chrome.storage.local.set({ settings });
-        settingsView.classList.add('hidden');
+        chrome.storage.local.set({ settings }, () => {
+            elements.settingsView.classList.add('hidden');
+        });
     });
 
     async function loadSettings() {
         const { settings } = await chrome.storage.local.get('settings');
         if (settings) {
             selectedResetDay = settings.resetDay;
-            resetPeriodSelect.value = settings.resetPeriod;
+            elements.resetPeriodSelect.value = settings.resetPeriod || '30';
         }
-        generateCalendar(calendarContainer, selectedResetDay, (day) => {
+        generateCalendar(elements.calendarContainer, selectedResetDay, (day) => {
             selectedResetDay = day;
-            generateCalendar(calendarContainer, day, () => {});
+            generateCalendar(elements.calendarContainer, day, () => {});
         });
     }
 
-    // --- Tab Switching Logic ---
-    tabLinks.forEach(link => {
+    // --- Tab Switching ---
+    elements.tabLinks.forEach(link => {
         link.addEventListener('click', () => {
             const tabId = link.dataset.tab;
-
-            tabLinks.forEach(l => l.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-
+            elements.tabLinks.forEach(l => l.classList.remove('active'));
+            elements.tabContents.forEach(c => c.classList.remove('active'));
             link.classList.add('active');
             document.getElementById(tabId).classList.add('active');
         });
     });
 
-    // --- Utility Functions ---
+    // --- Rendering ---
     function formatBytes(bytes) {
-        if (bytes === 0) return '0 B';
+        if (!bytes || bytes === 0) return '0 B';
         const k = 1024;
         const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
     }
 
     function getTabColor(index) {
@@ -81,65 +90,34 @@ document.addEventListener('DOMContentLoaded', () => {
         return colors[index % colors.length];
     }
 
-    // --- Rendering Logic ---
-    function renderSites(dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings) {
-        sitesContainer.innerHTML = '';
-        loadingMessageEl.style.display = 'none';
-
-        const allDomains = new Set(Object.keys(dataUsage));
-        pausedDomains.forEach(domain => allDomains.add(domain));
+    function renderSites(dataUsage, pausedDomains, tabData) {
+        elements.loadingMessage.style.display = 'none';
+        elements.sitesContainer.innerHTML = '';
+        const allDomains = new Set([...Object.keys(dataUsage || {}), ...Object.keys(pausedDomains || {})]);
 
         if (allDomains.size === 0) {
-            sitesContainer.innerHTML = '<div class="site-entry"><div class="site-info">No data tracked yet.</div></div>';
+            elements.sitesContainer.innerHTML = '<div class="site-entry"><div class="site-info">No data tracked yet.</div></div>';
+            elements.totalUsage.textContent = 'Total: 0 B';
             return;
         }
 
-        const sortedDomains = Array.from(allDomains).sort((a, b) => {
-            const usageA = dataUsage[a] ? dataUsage[a].totalSize : -1;
-            const usageB = dataUsage[b] ? dataUsage[b].totalSize : -1;
-            return usageB - usageA;
+        const sortedDomains = Array.from(allDomains).sort((a, b) => (dataUsage[b]?.totalSize || 0) - (dataUsage[a]?.totalSize || 0));
+        let totalBytes = 0;
+
+        sortedDomains.forEach(domain => {
+            const usage = dataUsage[domain]?.totalSize || 0;
+            totalBytes += usage;
+            const siteEntry = createSingleSiteEntry(domain, usage, pausedDomains[domain], tabData[domain]);
+            elements.sitesContainer.appendChild(siteEntry);
         });
 
-        const highUsageSites = [];
-        const lowUsageSites = [];
-        let lowUsageTotal = 0;
-        const LOW_USAGE_THRESHOLD = 10 * 1024 * 1024; // 10MB
-
-        let totalBytes = 0;
-        for (const domain of sortedDomains) {
-            const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
-            totalBytes += usage;
-            if (usage < LOW_USAGE_THRESHOLD) {
-                lowUsageSites.push(domain);
-                lowUsageTotal += usage;
-            } else {
-                highUsageSites.push(domain);
-            }
-        }
-
-        for (const domain of highUsageSites) {
-            const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
-            const isPaused = pausedDomains.includes(domain);
-            const tabCount = tabCounts[domain] || 0;
-            const serviceUsers = serviceUsageMap[domain] ? serviceUsageMap[domain].size : 0;
-            const singleTabInfo = singleTabs[domain];
-            const siteEntry = createSingleSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo, autoPauseSettings);
-            sitesContainer.appendChild(siteEntry);
-        }
-
-        if (lowUsageSites.length > 0) {
-            createCompactedEntry(lowUsageSites, lowUsageTotal, dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings);
-        }
-
-        totalUsageEl.textContent = formatBytes(totalBytes);
+        elements.totalUsage.textContent = `Total: ${formatBytes(totalBytes)}`;
     }
 
-    function createSingleSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo, autoPauseSettings) {
+    function createSingleSiteEntry(domain, usage, isPaused, domainTabData) {
         const siteEntry = document.createElement('div');
         siteEntry.className = 'site-entry';
-        if (isPaused) {
-            siteEntry.classList.add('paused');
-        }
+        if (isPaused) siteEntry.classList.add('paused');
 
         const siteInfo = document.createElement('div');
         siteInfo.className = 'site-info';
@@ -147,39 +125,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const siteDomain = document.createElement('div');
         siteDomain.className = 'site-domain';
         siteDomain.textContent = domain;
+        siteInfo.appendChild(siteDomain);
 
-        if (tabCount > 0) {
+        if (domainTabData?.tabs?.length > 0) {
             const tabCountEl = document.createElement('span');
             tabCountEl.className = 'tab-count';
-            tabCountEl.textContent = `${tabCount} tab${tabCount > 1 ? 's' : ''}`;
+            tabCountEl.textContent = `${domainTabData.tabs.length}`;
 
-            if (dataUsage[domain] && dataUsage[domain].tabs) {
-                const tabs = Object.values(dataUsage[domain].tabs);
-                if (tabs.length > 1) {
-                    const sortedTabs = Object.entries(dataUsage[domain].tabs).sort(([, a], [, b]) => b.totalSize - a.totalSize);
-                    const [topTabId, topTabData] = sortedTabs[0];
-                    const topTabIndex = Object.keys(dataUsage[domain].tabs).indexOf(topTabId);
-
-                    const colorIndicator = document.createElement('span');
-                    colorIndicator.className = 'color-indicator';
-                    colorIndicator.style.backgroundColor = getTabColor(topTabIndex);
-                    colorIndicator.textContent = topTabIndex + 1;
-                    colorIndicator.title = `Top consuming tab: ${topTabData.title}`;
-
-                    colorIndicator.addEventListener('click', () => {
-                        chrome.tabs.update(parseInt(topTabId), { active: true });
-                        chrome.windows.update(topTabData.windowId, { focused: true });
-                    });
-
-                    tabCountEl.appendChild(colorIndicator);
-                }
-            }
-
-            if (singleTabInfo) {
+            const topTab = domainTabData.topTab;
+            if (topTab) {
                 tabCountEl.classList.add('clickable');
-                tabCountEl.addEventListener('click', () => {
-                    chrome.windows.update(singleTabInfo.windowId, { focused: true });
-                    chrome.tabs.update(singleTabInfo.tabId, { active: true });
+                tabCountEl.style.backgroundColor = getTabColor(topTab.tabId);
+                tabCountEl.title = `Top consumer: ${formatBytes(topTab.usage)}. Click to focus.`;
+                tabCountEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    chrome.windows.update(topTab.windowId, { focused: true });
+                    chrome.tabs.update(topTab.tabId, { active: true });
                 });
             }
             siteDomain.appendChild(tabCountEl);
@@ -188,143 +149,47 @@ document.addEventListener('DOMContentLoaded', () => {
         const siteUsage = document.createElement('div');
         siteUsage.className = 'site-usage';
         siteUsage.textContent = formatBytes(usage);
-
-        siteInfo.appendChild(siteDomain);
         siteInfo.appendChild(siteUsage);
-
-        if (serviceUsers > 1) {
-            const serviceInfo = document.createElement('div');
-            serviceInfo.className = 'service-info';
-            serviceInfo.textContent = `Used by ${serviceUsers} sites`;
-            siteInfo.appendChild(serviceInfo);
-        }
 
         const siteControls = document.createElement('div');
         siteControls.className = 'site-controls';
-
-        const autoPauseBtn = document.createElement('button');
-        autoPauseBtn.className = 'auto-pause-btn';
-        autoPauseBtn.textContent = 'Auto';
-        if (autoPauseSettings && autoPauseSettings[domain]) {
-            autoPauseBtn.classList.add('active');
-        }
-
         const pauseBtn = document.createElement('button');
         pauseBtn.textContent = isPaused ? 'Unpause' : 'Pause';
         pauseBtn.className = isPaused ? 'unpause-btn' : 'pause-btn';
-
-        pauseBtn.onclick = () => {
-            const action = isPaused ? 'unpauseDomain' : 'pauseDomain';
-            chrome.runtime.sendMessage({ action, domain });
-        };
-
-        const timeMenu = document.createElement('div');
-        timeMenu.className = 'time-menu hidden';
-
-        const timeInput = document.createElement('input');
-        timeInput.type = 'time';
-        timeMenu.appendChild(timeInput);
-
-        const setTimeBtn = document.createElement('button');
-        setTimeBtn.textContent = 'Set';
-        setTimeBtn.addEventListener('click', () => {
-            if (timeInput.value) {
-                chrome.runtime.sendMessage({ action: 'setAutoPause', domain: domain, time: timeInput.value });
-                timeMenu.classList.add('hidden');
-            }
-        });
-        timeMenu.appendChild(setTimeBtn);
-
-        const clearTimeBtn = document.createElement('button');
-        clearTimeBtn.textContent = 'Clear';
-        clearTimeBtn.addEventListener('click', () => {
-            chrome.runtime.sendMessage({ action: 'clearAutoPause', domain: domain });
-            timeMenu.classList.add('hidden');
-        });
-        timeMenu.appendChild(clearTimeBtn);
-
-        autoPauseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            timeMenu.classList.toggle('hidden');
-        });
-
-        siteControls.appendChild(autoPauseBtn);
+        pauseBtn.onclick = () => chrome.runtime.sendMessage({ action: isPaused ? 'unpauseDomain' : 'pauseDomain', domain });
         siteControls.appendChild(pauseBtn);
-        siteControls.appendChild(timeMenu);
+
         siteEntry.appendChild(siteInfo);
         siteEntry.appendChild(siteControls);
         return siteEntry;
     }
 
-    function createCompactedEntry(sites, totalUsage, dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings) {
-        const compactedEntry = document.createElement('div');
-        compactedEntry.className = 'site-entry compacted';
-
-        const header = document.createElement('div');
-        header.className = 'header';
-        header.textContent = `Low-usage sites (${sites.length}) - ${formatBytes(totalUsage)}`;
-        header.addEventListener('click', () => {
-            compactedEntry.classList.toggle('expanded');
-        });
-        compactedEntry.appendChild(header);
-
-        const details = document.createElement('div');
-        details.className = 'details';
-        for (const domain of sites) {
-            const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
-            const isPaused = pausedDomains.includes(domain);
-            const tabCount = tabCounts[domain] || 0;
-            const serviceUsers = serviceUsageMap[domain] ? serviceUsageMap[domain].size : 0;
-            const singleTabInfo = singleTabs[domain];
-            const siteEntry = createSingleSiteEntry(domain, usage, isPaused, tabCount, serviceUsers, singleTabInfo, autoPauseSettings);
-            details.appendChild(siteEntry);
-        }
-        compactedEntry.appendChild(details);
-        sitesContainer.appendChild(compactedEntry);
-    }
-
-    // --- Data Fetching and Updates ---
+    // --- Data & UI Updates ---
     async function updateUI() {
-        loadingMessageEl.style.display = 'block';
-        sitesContainer.innerHTML = '';
-
-        const [storageData, tabs] = await Promise.all([
-            chrome.storage.local.get(['dataUsage', 'pausedDomains', 'serviceUsageMap', 'autoPauseSettings']),
-            chrome.tabs.query({})
+        elements.loadingMessage.style.display = 'block';
+        const [storageData, tabInfo] = await Promise.all([
+            chrome.storage.local.get(['dataUsage', 'pausedDomains', 'lastMonthUsage']),
+            chrome.runtime.sendMessage({ action: 'getTabInfo' })
         ]);
 
-        const tabCounts = {};
-        const singleTabs = {};
-        const domainToTabMap = {};
+        renderSites(storageData.dataUsage, storageData.pausedDomains, tabInfo.tabData);
 
-        for (const tab of tabs) {
-            try {
-                const domain = new URL(tab.url).hostname;
-                if (!domainToTabMap[domain]) {
-                    domainToTabMap[domain] = [];
+        if (storageData.lastMonthUsage) {
+            const currentTotal = Object.values(storageData.dataUsage || {}).reduce((sum, site) => sum + (site.totalSize || 0), 0);
+            const lastMonthTotal = storageData.lastMonthUsage;
+            if (lastMonthTotal > 0) {
+                const percentageChange = ((currentTotal - lastMonthTotal) / lastMonthTotal * 100);
+                let comparisonText = `${Math.abs(percentageChange).toFixed(0)}% vs last month`;
+                elements.lastMonthComparison.className = 'comparison-text';
+                if (percentageChange > 0.1) {
+                    elements.lastMonthComparison.classList.add('increase');
+                    comparisonText = `+${comparisonText}`;
+                } else if (percentageChange < -0.1) {
+                     elements.lastMonthComparison.classList.add('decrease');
                 }
-                domainToTabMap[domain].push({ tabId: tab.id, windowId: tab.windowId });
-            } catch (e) {
-                // Ignore invalid URLs
+                elements.lastMonthComparison.textContent = comparisonText;
             }
         }
-
-        for (const domain in domainToTabMap) {
-            const domainTabs = domainToTabMap[domain];
-            tabCounts[domain] = domainTabs.length;
-            if (domainTabs.length === 1) {
-                singleTabs[domain] = domainTabs[0];
-            }
-        }
-
-        renderSites(
-            storageData.dataUsage || {},
-            storageData.pausedDomains || [],
-            tabCounts,
-            storageData.serviceUsageMap || {},
-            singleTabs,
-            storageData.autoPauseSettings || {}
-        );
     }
 
     // --- Event Listeners ---
@@ -334,49 +199,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    const versionNumberEl = document.getElementById('version-number');
-    versionNumberEl.textContent = chrome.runtime.getManifest().version;
-
-    const clearDataBtn = document.getElementById('clear-data-btn');
-    clearDataBtn.addEventListener('click', () => {
+    elements.clearDataBtn.addEventListener('click', () => {
         if (confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
             chrome.runtime.sendMessage({ action: 'clearAllData' });
         }
     });
 
-    // --- Setup Flow ---
-    const setupView = document.getElementById('setup-view');
-    const mainView = document.getElementById('main-view');
-    const setupCalendarContainer = document.getElementById('setup-calendar-container');
-    const saveSetupBtn = document.getElementById('save-setup-btn');
-    let setupSelectedResetDay = null;
-
-    function generateSetupCalendar(selectedDay) {
-        setupCalendarContainer.innerHTML = '';
-        for (let i = 1; i <= 31; i++) {
-            const dayEl = document.createElement('div');
-            dayEl.className = 'calendar-day';
-            dayEl.textContent = i;
-            if (i === selectedDay) {
-                dayEl.classList.add('selected');
-            }
-            dayEl.addEventListener('click', () => {
-                setupSelectedResetDay = i;
-                generateSetupCalendar(i);
-            });
-            setupCalendarContainer.appendChild(dayEl);
-        }
-    }
-
-    saveSetupBtn.addEventListener('click', () => {
-        if (setupSelectedResetDay) {
-            const settings = {
-                resetDay: setupSelectedResetDay,
-                resetPeriod: 30 // Default to 30 days
-            };
+    // --- Initialisation Flow ---
+    elements.saveSetupBtn.addEventListener('click', () => {
+        if (selectedResetDay) {
+            const settings = { resetDay: selectedResetDay, resetPeriod: '30' };
             chrome.storage.local.set({ settings, isSetupComplete: true }, () => {
-                setupView.style.display = 'none';
-                mainView.style.display = 'block';
                 initializeMainView();
             });
         }
@@ -385,24 +218,40 @@ document.addEventListener('DOMContentLoaded', () => {
     async function checkSetup() {
         const { isSetupComplete } = await chrome.storage.local.get('isSetupComplete');
         if (isSetupComplete) {
-            setupView.style.display = 'none';
-            mainView.style.display = 'block';
             initializeMainView();
         } else {
-            setupView.style.display = 'block';
-            mainView.style.display = 'none';
-            generateSetupCalendar(setupCalendarContainer, null, (day) => {
-                setupSelectedResetDay = day;
-                generateSetupCalendar(setupCalendarContainer, day, () => {});
+            elements.mainView.classList.remove('active');
+            elements.setupView.classList.add('active');
+            generateCalendar(elements.setupCalendarContainer, selectedResetDay, (day) => {
+                selectedResetDay = day;
+                generateCalendar(elements.setupCalendarContainer, day, () => {});
             });
         }
     }
 
-    function initializeMainView() {
-        updateUI();
-        loadSettings();
+    async function initializeMainView() {
+        elements.setupView.classList.remove('active');
+        elements.mainView.classList.add('active');
+
+        const manifest = chrome.runtime.getManifest();
+        elements.versionNumber.textContent = manifest.version;
+
+        try {
+            if (navigator.userAgentData) {
+                const uaData = await navigator.userAgentData.getHighEntropyValues(["platform", "platformVersion", "architecture", "model", "uaFullVersion"]);
+                const brands = uaData.brands.filter(b => !b.brand.includes("Not"));
+                elements.browserVersion.textContent = `${brands.map(b => `${b.brand} ${b.version}`).join(', ')} on ${uaData.platform}`;
+            } else {
+                 const platform = await chrome.runtime.getPlatformInfo();
+                 elements.browserVersion.textContent = `Chrome on ${platform.os}`;
+            }
+        } catch(e) {
+            elements.browserVersion.textContent = 'Browser info not available';
+        }
+
+        await loadSettings();
+        await updateUI();
     }
 
-    // Initial Load
     checkSetup();
 });

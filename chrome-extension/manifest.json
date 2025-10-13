@@ -6,10 +6,9 @@
   "permissions": [
     "webRequest",
     "storage",
-    "activeTab",
+    "tabs",
     "notifications",
     "declarativeNetRequest",
-    "declarativeNetRequestWithHostAccess",
     "webNavigation",
     "alarms"
   ],
@@ -18,8 +17,16 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_icon": "icon.svg",
-    "default_title": "Data Tracker"
+    "default_icon": {
+      "16": "icon.svg",
+      "48": "icon.svg",
+      "128": "icon.svg"
+    }
+  },
+  "icons": {
+    "16": "icon.svg",
+    "48": "icon.svg",
+    "128": "icon.svg"
   },
   "host_permissions": [
     "<all_urls>"
