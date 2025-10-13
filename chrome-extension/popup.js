@@ -76,6 +76,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
+    function getTabColor(index) {
+        const colors = ['#81D4FA', '#A5D6A7', '#FFAB91', '#CE93D8', '#F48FB1'];
+        return colors[index % colors.length];
+    }
+
     // --- Rendering Logic ---
     function renderSites(dataUsage, pausedDomains, tabCounts, serviceUsageMap, singleTabs, autoPauseSettings) {
         sitesContainer.innerHTML = '';
@@ -147,6 +152,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const tabCountEl = document.createElement('span');
             tabCountEl.className = 'tab-count';
             tabCountEl.textContent = `${tabCount} tab${tabCount > 1 ? 's' : ''}`;
+
+            if (dataUsage[domain] && dataUsage[domain].tabs) {
+                const tabs = Object.values(dataUsage[domain].tabs);
+                if (tabs.length > 1) {
+                    const sortedTabs = Object.entries(dataUsage[domain].tabs).sort(([, a], [, b]) => b.totalSize - a.totalSize);
+                    const [topTabId, topTabData] = sortedTabs[0];
+                    const topTabIndex = Object.keys(dataUsage[domain].tabs).indexOf(topTabId);
+
+                    const colorIndicator = document.createElement('span');
+                    colorIndicator.className = 'color-indicator';
+                    colorIndicator.style.backgroundColor = getTabColor(topTabIndex);
+                    colorIndicator.textContent = topTabIndex + 1;
+                    colorIndicator.title = `Top consuming tab: ${topTabData.title}`;
+
+                    colorIndicator.addEventListener('click', () => {
+                        chrome.tabs.update(parseInt(topTabId), { active: true });
+                        chrome.windows.update(topTabData.windowId, { focused: true });
+                    });
+
+                    tabCountEl.appendChild(colorIndicator);
+                }
+            }
 
             if (singleTabInfo) {
                 tabCountEl.classList.add('clickable');
@@ -358,11 +385,16 @@ document.addEventListener('DOMContentLoaded', () => {
     async function checkSetup() {
         const { isSetupComplete } = await chrome.storage.local.get('isSetupComplete');
         if (isSetupComplete) {
-            document.body.classList.remove('setup');
+            setupView.style.display = 'none';
+            mainView.style.display = 'block';
             initializeMainView();
         } else {
-            document.body.classList.add('setup');
-            generateSetupCalendar(null);
+            setupView.style.display = 'block';
+            mainView.style.display = 'none';
+            generateSetupCalendar(setupCalendarContainer, null, (day) => {
+                setupSelectedResetDay = day;
+                generateSetupCalendar(setupCalendarContainer, day, () => {});
+            });
         }
     }
 

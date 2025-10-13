@@ -176,6 +176,29 @@ chrome.webRequest.onCompleted.addListener(
             });
             if (tab) {
                 if (!domainDataUsage[initiatorDomain].tabs[tabId]) {
+                    domainDataUsage[initiatorDomain].tabs[tabId] = { totalSize: 0, title: tab.title, windowId: tab.windowId };
+                }
+                domainDataUsage[initiatorDomain].tabs[tabId].totalSize += size;
+                domainDataUsage[initiatorDomain].tabs[tabId].title = tab.title; // Update title in case it changes
+            }
+        } catch (e) {
+            // Tab may have been closed
+        }
+    }
+
+    // Track per-tab usage
+    if (tabId !== -1) {
+        try {
+            const tab = await new Promise((resolve, reject) => {
+                chrome.tabs.get(tabId, (tab) => {
+                    if (chrome.runtime.lastError) {
+                        return reject(chrome.runtime.lastError);
+                    }
+                    resolve(tab);
+                });
+            });
+            if (tab) {
+                if (!domainDataUsage[initiatorDomain].tabs[tabId]) {
                     domainDataUsage[initiatorDomain].tabs[tabId] = { totalSize: 0, title: tab.title };
                 }
                 domainDataUsage[initiatorDomain].tabs[tabId].totalSize += size;
