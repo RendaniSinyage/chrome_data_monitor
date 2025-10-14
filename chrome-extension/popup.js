@@ -101,17 +101,64 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const sortedDomains = Array.from(allDomains).sort((a, b) => (dataUsage[b]?.totalSize || 0) - (dataUsage[a]?.totalSize || 0));
+        const sortedDomains = Array.from(allDomains)
+            .map(domain => ({
+                domain,
+                usage: dataUsage[domain]?.totalSize || 0,
+                hasTabs: (tabData[domain]?.tabs?.length || 0) > 0
+            }))
+            .sort((a, b) => {
+                if (b.usage !== a.usage) {
+                    return b.usage - a.usage;
+                }
+                // If usage is the same, prioritize sites with tabs
+                return b.hasTabs - a.hasTabs;
+            });
+
         let totalBytes = 0;
-
-        sortedDomains.forEach(domain => {
-            const usage = dataUsage[domain]?.totalSize || 0;
-            totalBytes += usage;
-            const siteEntry = createSingleSiteEntry(domain, usage, pausedDomains[domain], tabData[domain]);
-            elements.sitesContainer.appendChild(siteEntry);
-        });
-
+        sortedDomains.forEach(d => totalBytes += d.usage);
         elements.totalUsage.textContent = `Total: ${formatBytes(totalBytes)}`;
+
+        if (sortedDomains.length <= 4) {
+            sortedDomains.forEach(item => {
+                const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain]);
+                elements.sitesContainer.appendChild(siteEntry);
+            });
+        } else {
+            const top3 = sortedDomains.slice(0, 3);
+            const others = sortedDomains.slice(3);
+
+            top3.forEach(item => {
+                const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain]);
+                elements.sitesContainer.appendChild(siteEntry);
+            });
+
+            const otherUsage = others.reduce((sum, item) => sum + item.usage, 0);
+            const otherDomains = others.map(item => item.domain);
+            const compoundedEntry = createCompoundedSiteEntry(otherUsage, otherDomains.length);
+            elements.sitesContainer.appendChild(compoundedEntry);
+        }
+    }
+
+    function createCompoundedSiteEntry(usage, count) {
+        const siteEntry = document.createElement('div');
+        siteEntry.className = 'site-entry';
+
+        const siteInfo = document.createElement('div');
+        siteInfo.className = 'site-info';
+
+        const siteDomain = document.createElement('div');
+        siteDomain.className = 'site-domain';
+        siteDomain.textContent = `Other sites (${count})`;
+        siteInfo.appendChild(siteDomain);
+
+        const siteUsage = document.createElement('div');
+        siteUsage.className = 'site-usage';
+        siteUsage.textContent = formatBytes(usage);
+        siteInfo.appendChild(siteUsage);
+
+        siteEntry.appendChild(siteInfo);
+        return siteEntry;
     }
 
     function createSingleSiteEntry(domain, usage, isPaused, domainTabData) {
