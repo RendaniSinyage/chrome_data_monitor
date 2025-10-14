@@ -163,6 +163,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     chrome.windows.update(topTab.windowId, { focused: true });
                     chrome.tabs.update(topTab.tabId, { active: true });
                 });
+
+                const progressBar = createProgressBar(usage, topTab.usage);
+                siteInfo.appendChild(progressBar);
             }
             siteDomain.appendChild(tabCountEl);
         }
@@ -183,6 +186,25 @@ document.addEventListener('DOMContentLoaded', () => {
         siteEntry.appendChild(siteInfo);
         siteEntry.appendChild(siteControls);
         return siteEntry;
+    }
+
+    function createProgressBar(totalUsage, topTabUsage) {
+        const progressBarContainer = document.createElement('div');
+        progressBarContainer.className = 'progress-bar-container';
+
+        const totalBar = document.createElement('div');
+        totalBar.className = 'progress-bar total-bar';
+
+        if (totalUsage > 0) {
+            const topTabPercentage = (topTabUsage / totalUsage) * 100;
+            const topTabEl = document.createElement('div');
+            topTabEl.className = 'progress-bar top-tab-bar';
+            topTabEl.style.width = `${topTabPercentage}%`;
+            totalBar.appendChild(topTabEl);
+        }
+
+        progressBarContainer.appendChild(totalBar);
+        return progressBarContainer;
     }
 
     function createCompoundedSiteEntry(usage, count) {
