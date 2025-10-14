@@ -101,22 +101,18 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const sortedDomains = Array.from(allDomains)
-            .map(domain => ({
-                domain,
-                usage: dataUsage[domain]?.totalSize || 0,
-                hasTabs: (tabData[domain]?.tabs?.length || 0) > 0
-            }))
-            .sort((a, b) => {
-                if (b.usage !== a.usage) {
-                    return b.usage - a.usage;
-                }
-                // If usage is the same, prioritize sites with tabs
-                return b.hasTabs - a.hasTabs;
-            });
+        const allDomainsRanked = Array.from(allDomains).map(domain => ({
+            domain,
+            usage: dataUsage[domain]?.totalSize || 0,
+            hasTabs: (tabData[domain]?.tabs?.length || 0) > 0,
+        }));
 
+        const sitesWithTabs = allDomainsRanked.filter(d => d.hasTabs).sort((a, b) => b.usage - a.usage);
+        const sitesWithoutTabs = allDomainsRanked.filter(d => !d.hasTabs).sort((a, b) => b.usage - a.usage);
+
+        const sortedDomains = [...sitesWithTabs, ...sitesWithoutTabs];
         let totalBytes = 0;
-        sortedDomains.forEach(d => totalBytes += d.usage);
+        allDomainsRanked.forEach(d => totalBytes += d.usage);
         elements.totalUsage.textContent = `Total: ${formatBytes(totalBytes)}`;
 
         if (sortedDomains.length <= 4) {
@@ -125,40 +121,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 elements.sitesContainer.appendChild(siteEntry);
             });
         } else {
-            const top3 = sortedDomains.slice(0, 3);
+            const displayList = sortedDomains.slice(0, 3);
             const others = sortedDomains.slice(3);
 
-            top3.forEach(item => {
+            displayList.forEach(item => {
                 const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain]);
                 elements.sitesContainer.appendChild(siteEntry);
             });
 
             const otherUsage = others.reduce((sum, item) => sum + item.usage, 0);
-            const otherDomains = others.map(item => item.domain);
-            const compoundedEntry = createCompoundedSiteEntry(otherUsage, otherDomains.length);
+            const compoundedEntry = createCompoundedSiteEntry(otherUsage, others.length);
             elements.sitesContainer.appendChild(compoundedEntry);
         }
-    }
-
-    function createCompoundedSiteEntry(usage, count) {
-        const siteEntry = document.createElement('div');
-        siteEntry.className = 'site-entry';
-
-        const siteInfo = document.createElement('div');
-        siteInfo.className = 'site-info';
-
-        const siteDomain = document.createElement('div');
-        siteDomain.className = 'site-domain';
-        siteDomain.textContent = `Other sites (${count})`;
-        siteInfo.appendChild(siteDomain);
-
-        const siteUsage = document.createElement('div');
-        siteUsage.className = 'site-usage';
-        siteUsage.textContent = formatBytes(usage);
-        siteInfo.appendChild(siteUsage);
-
-        siteEntry.appendChild(siteInfo);
-        return siteEntry;
     }
 
     function createSingleSiteEntry(domain, usage, isPaused, domainTabData) {
@@ -208,6 +182,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
         siteEntry.appendChild(siteInfo);
         siteEntry.appendChild(siteControls);
+        return siteEntry;
+    }
+
+    function createCompoundedSiteEntry(usage, count) {
+        const siteEntry = document.createElement('div');
+        siteEntry.className = 'site-entry';
+
+        const siteInfo = document.createElement('div');
+        siteInfo.className = 'site-info';
+
+        const siteDomain = document.createElement('div');
+        siteDomain.className = 'site-domain';
+        siteDomain.textContent = `Other sites (${count})`;
+        siteInfo.appendChild(siteDomain);
+
+        const siteUsage = document.createElement('div');
+        siteUsage.className = 'site-usage';
+        siteUsage.textContent = formatBytes(usage);
+        siteInfo.appendChild(siteUsage);
+
+        siteEntry.appendChild(siteInfo);
         return siteEntry;
     }
 
