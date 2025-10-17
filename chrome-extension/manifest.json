@@ -18,15 +18,15 @@
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "icon.svg",
-      "48": "icon.svg",
-      "128": "icon.svg"
+      "16": "icon_v2.svg",
+      "48": "icon_v2.svg",
+      "128": "icon_v2.svg"
     }
   },
   "icons": {
-    "16": "icon.svg",
-    "48": "icon.svg",
-    "128": "icon.svg"
+    "16": "icon_v2.svg",
+    "48": "icon_v2.svg",
+    "128": "icon_v2.svg"
   },
   "host_permissions": [
     "<all_urls>"

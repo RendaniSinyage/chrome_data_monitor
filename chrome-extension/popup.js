@@ -245,11 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const daysSinceReset = Math.ceil((now - lastReset) / (1000 * 60 * 60 * 24));
             const periodLength = parseInt(storageData.settings.resetPeriod, 10) || 30;
 
-            if (daysSinceReset <= 3) {
-                elements.sinceDateInfo.textContent = `Day ${daysSinceReset} of ${periodLength}`;
-            } else {
-                elements.sinceDateInfo.textContent = `since ${lastReset.toLocaleDateString()}`;
-            }
+            elements.sinceDateInfo.textContent = `Day ${daysSinceReset} of ${periodLength}`;
         }
 
 

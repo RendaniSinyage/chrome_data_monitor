@@ -5,31 +5,22 @@ let pausedDomains = {};
 let isDirty = false;
 
 // --- Initialization ---
-let dataLoadedPromise = null;
-
-function loadInitialData() {
-    if (!dataLoadedPromise) {
-        dataLoadedPromise = (async () => {
-            const result = await chrome.storage.local.get(['dataUsage', 'serviceUsageMap', 'pausedDomains']);
-            dataUsage = result.dataUsage || {};
-            pausedDomains = result.pausedDomains || {};
-            if (result.serviceUsageMap) {
-                for (const service in result.serviceUsageMap) {
-                    serviceUsageMap[service] = new Set(result.serviceUsageMap[service]);
-                }
-            }
-        })();
+const dataLoadedPromise = (async () => {
+    const result = await chrome.storage.local.get(['dataUsage', 'serviceUsageMap', 'pausedDomains']);
+    dataUsage = result.dataUsage || {};
+    pausedDomains = result.pausedDomains || {};
+    if (result.serviceUsageMap) {
+        for (const service in result.serviceUsageMap) {
+            serviceUsageMap[service] = new Set(result.serviceUsageMap[service]);
+        }
     }
-    return dataLoadedPromise;
-}
+})();
 
-// Load data immediately when the script is first executed.
-loadInitialData();
+chrome.runtime.onStartup.addListener(() => {
+    // Data is already being loaded by the top-level promise
+});
 
-// Also ensure data is loaded on startup and installation.
-chrome.runtime.onStartup.addListener(loadInitialData);
 chrome.runtime.onInstalled.addListener((details) => {
-    loadInitialData();
     chrome.alarms.create('dataSaver', { periodInMinutes: 1 / 30 });
     chrome.alarms.create('dailyResetChecker', { periodInMinutes: 60 });
     if (details.reason === 'install') {
@@ -65,6 +56,7 @@ function simpleHash(str) {
 
 // --- Pause/Unpause Logic ---
 async function pauseDomain(domain) {
+    await dataLoadedPromise;
     if (pausedDomains[domain]) return;
     pausedDomains[domain] = true;
 
@@ -82,6 +74,7 @@ async function pauseDomain(domain) {
 }
 
 async function unpauseDomain(domain) {
+    await dataLoadedPromise;
     if (!pausedDomains[domain]) return;
     delete pausedDomains[domain];
 
@@ -94,7 +87,7 @@ async function unpauseDomain(domain) {
 // --- Core Data Tracking Logic ---
 chrome.webRequest.onCompleted.addListener(
   async (details) => {
-    await loadInitialData();
+    await dataLoadedPromise;
     const { initiator, url, responseHeaders, tabId } = details;
 
     // Ignore requests from the extension itself
@@ -172,7 +165,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     };
 
     const performAction = async () => {
-        await loadInitialData();
+        await dataLoadedPromise;
         if (actions[request.action]) {
             const result = await actions[request.action](request);
             sendResponse(result);
@@ -239,19 +232,34 @@ async function clearAllData() {
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-    await loadInitialData();
+    await dataLoadedPromise;
     if (alarm.name === 'dataSaver') {
         saveData();
     } else if (alarm.name === 'dailyResetChecker') {
         const { settings, lastResetDate } = await chrome.storage.local.get(['settings', 'lastResetDate']);
-        if (!settings?.resetDay) return;
+        if (!settings || !settings.resetDay) return;
 
         const now = new Date();
-        const lastReset = lastResetDate ? new Date(lastResetDate) : new Date(0);
-        const daysSinceReset = (now - lastReset) / (1000 * 60 * 60 * 24);
+        // If there's no last reset date, set it to now and exit.
+        if (!lastResetDate) {
+            await chrome.storage.local.set({ lastResetDate: now.toISOString() });
+            return;
+        }
 
-        if (now.getDate() == settings.resetDay && daysSinceReset > 25) {
-             await clearAllData();
+        const lastReset = new Date(lastResetDate);
+        let nextReset = new Date(lastReset);
+
+        // Calculate next reset date, ensuring it's in the future
+        if (now.getDate() >= settings.resetDay) {
+            nextReset.setMonth(now.getMonth() + 1);
+            nextReset.setDate(settings.resetDay);
+        } else {
+            nextReset.setDate(settings.resetDay);
+        }
+
+        // If the calculated next reset is in the past, it means we are in the next cycle
+        if (now >= nextReset) {
+            await clearAllData();
         }
     }
 });
