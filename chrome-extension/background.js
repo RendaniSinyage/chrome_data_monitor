@@ -5,10 +5,9 @@ let pausedDomains = {};
 let isDirty = false;
 
 // --- Initialization ---
-chrome.runtime.onStartup.addListener(loadInitialData);
+let dataLoaded = loadInitialData();
 
 chrome.runtime.onInstalled.addListener((details) => {
-    loadInitialData();
     chrome.alarms.create('dataSaver', { periodInMinutes: 1 / 30 });
     chrome.alarms.create('dailyResetChecker', { periodInMinutes: 60 });
     if (details.reason === 'install') {
@@ -84,6 +83,7 @@ async function unpauseDomain(domain) {
 // --- Core Data Tracking Logic ---
 chrome.webRequest.onCompleted.addListener(
   async (details) => {
+    await dataLoaded;
     const { initiator, url, responseHeaders, tabId } = details;
 
     // Ignore requests from the extension itself
@@ -159,10 +159,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         pauseDomain: (req) => pauseDomain(req.domain),
         clearAllData: clearAllData,
     };
-    if (actions[request.action]) {
-        actions[request.action](request).then(sendResponse);
-        return true;
-    }
+
+    const performAction = async () => {
+        await dataLoaded;
+        if (actions[request.action]) {
+            const result = await actions[request.action](request);
+            sendResponse(result);
+        }
+    };
+
+    performAction();
+    return true;
 });
 
 async function getTabInfo() {
