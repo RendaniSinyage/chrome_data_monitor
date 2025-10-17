@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sitesContainer: document.getElementById('sites-container'),
         totalUsage: document.getElementById('total-usage'),
         lastMonthComparison: document.getElementById('last-month-comparison'),
+        sinceDateInfo: document.getElementById('since-date-info'),
         loadingMessage: document.getElementById('loading-message'),
         tabLinks: document.querySelectorAll('.tab-link'),
         tabContents: document.querySelectorAll('.tab-content'),
@@ -232,11 +233,25 @@ document.addEventListener('DOMContentLoaded', () => {
     async function updateUI() {
         elements.loadingMessage.style.display = 'block';
         const [storageData, tabInfo] = await Promise.all([
-            chrome.storage.local.get(['dataUsage', 'pausedDomains', 'lastMonthUsage']),
+            chrome.storage.local.get(['dataUsage', 'pausedDomains', 'lastMonthUsage', 'lastResetDate', 'settings']),
             chrome.runtime.sendMessage({ action: 'getTabInfo' })
         ]);
 
         renderSites(storageData.dataUsage, storageData.pausedDomains, tabInfo.tabData);
+
+        if (storageData.lastResetDate && storageData.settings) {
+            const lastReset = new Date(storageData.lastResetDate);
+            const now = new Date();
+            const daysSinceReset = Math.ceil((now - lastReset) / (1000 * 60 * 60 * 24));
+            const periodLength = parseInt(storageData.settings.resetPeriod, 10) || 30;
+
+            if (daysSinceReset <= 3) {
+                elements.sinceDateInfo.textContent = `Day ${daysSinceReset} of ${periodLength}`;
+            } else {
+                elements.sinceDateInfo.textContent = `since ${lastReset.toLocaleDateString()}`;
+            }
+        }
+
 
         if (storageData.lastMonthUsage) {
             const currentTotal = Object.values(storageData.dataUsage || {}).reduce((sum, site) => sum + (site.totalSize || 0), 0);
@@ -273,7 +288,8 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.saveSetupBtn.addEventListener('click', () => {
         if (selectedResetDay) {
             const settings = { resetDay: selectedResetDay, resetPeriod: '30' };
-            chrome.storage.local.set({ settings, isSetupComplete: true }, () => {
+            const now = new Date().toISOString();
+            chrome.storage.local.set({ settings, isSetupComplete: true, lastResetDate: now }, () => {
                 initializeMainView();
             });
         }

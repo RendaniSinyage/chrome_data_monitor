@@ -5,26 +5,37 @@ let pausedDomains = {};
 let isDirty = false;
 
 // --- Initialization ---
-let dataLoaded = loadInitialData();
+let dataLoadedPromise = null;
 
+function loadInitialData() {
+    if (!dataLoadedPromise) {
+        dataLoadedPromise = (async () => {
+            const result = await chrome.storage.local.get(['dataUsage', 'serviceUsageMap', 'pausedDomains']);
+            dataUsage = result.dataUsage || {};
+            pausedDomains = result.pausedDomains || {};
+            if (result.serviceUsageMap) {
+                for (const service in result.serviceUsageMap) {
+                    serviceUsageMap[service] = new Set(result.serviceUsageMap[service]);
+                }
+            }
+        })();
+    }
+    return dataLoadedPromise;
+}
+
+// Load data immediately when the script is first executed.
+loadInitialData();
+
+// Also ensure data is loaded on startup and installation.
+chrome.runtime.onStartup.addListener(loadInitialData);
 chrome.runtime.onInstalled.addListener((details) => {
+    loadInitialData();
     chrome.alarms.create('dataSaver', { periodInMinutes: 1 / 30 });
     chrome.alarms.create('dailyResetChecker', { periodInMinutes: 60 });
     if (details.reason === 'install') {
         chrome.storage.local.set({ isSetupComplete: false });
     }
 });
-
-async function loadInitialData() {
-    const result = await chrome.storage.local.get(['dataUsage', 'serviceUsageMap', 'pausedDomains']);
-    dataUsage = result.dataUsage || {};
-    pausedDomains = result.pausedDomains || {};
-    if (result.serviceUsageMap) {
-        for (const service in result.serviceUsageMap) {
-            serviceUsageMap[service] = new Set(result.serviceUsageMap[service]);
-        }
-    }
-}
 
 // --- Throttled Data Saving ---
 async function saveData() {
@@ -83,7 +94,7 @@ async function unpauseDomain(domain) {
 // --- Core Data Tracking Logic ---
 chrome.webRequest.onCompleted.addListener(
   async (details) => {
-    await dataLoaded;
+    await loadInitialData();
     const { initiator, url, responseHeaders, tabId } = details;
 
     // Ignore requests from the extension itself
@@ -161,7 +172,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     };
 
     const performAction = async () => {
-        await dataLoaded;
+        await loadInitialData();
         if (actions[request.action]) {
             const result = await actions[request.action](request);
             sendResponse(result);
@@ -214,16 +225,21 @@ async function getTabInfo() {
 // --- Data Reset Logic ---
 async function clearAllData() {
     const totalUsage = Object.values(dataUsage).reduce((sum, site) => sum + site.totalSize, 0);
-    await chrome.storage.local.set({ lastMonthUsage: totalUsage });
 
     dataUsage = {};
     serviceUsageMap = {};
-    isDirty = true;
-    await saveData();
-    await chrome.storage.local.set({ lastResetDate: new Date().toISOString() });
+    isDirty = false;
+
+    await chrome.storage.local.set({
+        lastMonthUsage: totalUsage,
+        dataUsage: {},
+        serviceUsageMap: {},
+        lastResetDate: new Date().toISOString()
+    });
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+    await loadInitialData();
     if (alarm.name === 'dataSaver') {
         saveData();
     } else if (alarm.name === 'dailyResetChecker') {
