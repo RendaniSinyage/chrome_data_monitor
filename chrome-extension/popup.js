@@ -278,7 +278,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Event Listeners ---
     chrome.storage.onChanged.addListener((changes, namespace) => {
         if (namespace === 'local' && (changes.dataUsage || changes.pausedDomains)) {
-            updateUI();
+            const oldTotal = changes.dataUsage?.oldValue ? Object.values(changes.dataUsage.oldValue).reduce((sum, site) => sum + site.totalSize, 0) : 0;
+            const newTotal = changes.dataUsage?.newValue ? Object.values(changes.dataUsage.newValue).reduce((sum, site) => sum + site.totalSize, 0) : 0;
+
+            updateUI().then(() => {
+                if (newTotal > oldTotal) {
+                    const upArrow = elements.lastMonthComparison.querySelector('.arrow-icon.active-red');
+                    if (upArrow) upArrow.classList.add('blinking');
+                } else if (newTotal < oldTotal) {
+                    const downArrow = elements.lastMonthComparison.querySelector('.arrow-icon.active-green');
+                    if (downArrow) downArrow.classList.add('blinking');
+                }
+            });
         }
     });
 

@@ -66,15 +66,20 @@ h1 {
 }
 
 .arrow-icon {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     vertical-align: middle;
     margin-bottom: 2px;
-    margin-right: -4px;
 }
 
 .comparison-text span {
+    margin-left: 4px;
+}
+
+#since-date-info {
     margin-left: 8px;
+    font-size: 0.8em;
+    color: #7f8c8d;
 }
 
 .arrow-icon.inactive {
@@ -87,6 +92,16 @@ h1 {
 
 .arrow-icon.active-green {
     filter: invert(65%) sepia(21%) saturate(952%) hue-rotate(85deg) brightness(94%) contrast(88%);
+}
+
+@keyframes blink {
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.blinking {
+    animation: blink 1s step-end 3;
 }
 
 /* --- Tab Styles --- */
