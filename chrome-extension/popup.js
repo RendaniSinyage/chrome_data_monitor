@@ -270,12 +270,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (percentageChange > 0.1) {
                 elements.lastMonthComparison.classList.add('increase');
-                comparisonText = `⬆ ${comparisonText}`;
+                comparisonText = `&uarr; ${comparisonText}`;
             } else if (percentageChange < -0.1) {
                  elements.lastMonthComparison.classList.add('decrease');
-                 comparisonText = `⬇ ${comparisonText}`;
+                 comparisonText = `&darr; ${comparisonText}`;
             }
-            elements.lastMonthComparison.textContent = comparisonText;
+            elements.lastMonthComparison.innerHTML = comparisonText;
         } else {
             elements.lastMonthComparison.textContent = '';
         }
