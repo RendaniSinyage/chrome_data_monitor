@@ -9,10 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
         tabLinks: document.querySelectorAll('.tab-link'),
         tabContents: document.querySelectorAll('.tab-content'),
         settingsBtn: document.getElementById('settings-btn'),
-        settingsView: document.getElementById('settings-view'),
-        saveSettingsBtn: document.getElementById('save-settings-btn'),
-        calendarContainer: document.getElementById('calendar-container'),
-        resetPeriodSelect: document.getElementById('reset-period'),
         versionNumber: document.getElementById('version-number'),
         browserVersion: document.getElementById('browser-version'),
         clearDataBtn: document.getElementById('clear-data-btn'),
@@ -24,46 +20,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let selectedResetDay = 1;
 
-    // --- Calendar Logic ---
-    function generateCalendar(container, currentSelectedDay, onDaySelect) {
-        container.innerHTML = '';
-        for (let i = 1; i <= 31; i++) {
-            const dayEl = document.createElement('div');
-            dayEl.className = 'calendar-day';
-            dayEl.textContent = i;
-            if (i === currentSelectedDay) {
-                dayEl.classList.add('selected');
-            }
-            dayEl.addEventListener('click', () => onDaySelect(i));
-            container.appendChild(dayEl);
-        }
-    }
-
     // --- Settings ---
     elements.settingsBtn.addEventListener('click', () => {
-        elements.settingsView.classList.toggle('hidden');
-    });
-
-    elements.saveSettingsBtn.addEventListener('click', () => {
-        const settings = {
-            resetDay: selectedResetDay,
-            resetPeriod: elements.resetPeriodSelect.value,
-        };
-        chrome.storage.local.set({ settings }, () => {
-            elements.settingsView.classList.add('hidden');
-        });
+        chrome.runtime.openOptionsPage ? chrome.runtime.openOptionsPage() : window.open(chrome.runtime.getURL('settings.html'));
     });
 
     async function loadSettings() {
-        const { settings } = await chrome.storage.local.get('settings');
-        if (settings) {
-            selectedResetDay = settings.resetDay;
-            elements.resetPeriodSelect.value = settings.resetPeriod || '30';
-        }
-        generateCalendar(elements.calendarContainer, selectedResetDay, (day) => {
-            selectedResetDay = day;
-            generateCalendar(elements.calendarContainer, day, () => {});
-        });
+        // This function is now empty as settings are managed on the settings page
     }
 
     // --- Tab Switching ---
@@ -263,21 +226,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
 
-        if (storageData.lastMonthUsage) {
+        const lastMonthTotal = storageData.lastMonthUsage || 0;
+        if (lastMonthTotal > 0 || (storageData.settings && storageData.settings.alwaysCompare)) {
             const currentTotal = Object.values(storageData.dataUsage || {}).reduce((sum, site) => sum + (site.totalSize || 0), 0);
-            const lastMonthTotal = storageData.lastMonthUsage;
-            if (lastMonthTotal > 0) {
-                const percentageChange = ((currentTotal - lastMonthTotal) / lastMonthTotal * 100);
-                let comparisonText = `${Math.abs(percentageChange).toFixed(0)}% vs last month`;
-                elements.lastMonthComparison.className = 'comparison-text';
-                if (percentageChange > 0.1) {
-                    elements.lastMonthComparison.classList.add('increase');
-                    comparisonText = `+${comparisonText}`;
-                } else if (percentageChange < -0.1) {
-                     elements.lastMonthComparison.classList.add('decrease');
-                }
-                elements.lastMonthComparison.textContent = comparisonText;
+            const percentageChange = lastMonthTotal > 0 ? ((currentTotal - lastMonthTotal) / lastMonthTotal * 100) : 100;
+
+            let comparisonText = `${Math.abs(percentageChange).toFixed(0)}% vs last month`;
+            elements.lastMonthComparison.className = 'comparison-text';
+
+            if (percentageChange > 0.1) {
+                elements.lastMonthComparison.classList.add('increase');
+                comparisonText = `+${comparisonText}`;
+            } else if (percentageChange < -0.1) {
+                 elements.lastMonthComparison.classList.add('decrease');
             }
+            elements.lastMonthComparison.textContent = comparisonText;
+        } else {
+            elements.lastMonthComparison.textContent = '';
         }
     }
 
