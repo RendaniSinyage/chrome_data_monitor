@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', () => {
         sitesContainer: document.getElementById('sites-container'),
         totalUsage: document.getElementById('total-usage'),
         lastMonthComparison: document.getElementById('last-month-comparison'),
-        sinceDateInfo: document.getElementById('since-date-info'),
         loadingMessage: document.getElementById('loading-message'),
         tabLinks: document.querySelectorAll('.tab-link'),
         tabContents: document.querySelectorAll('.tab-content'),
@@ -102,38 +101,43 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const allDomainsRanked = Array.from(allDomains).map(domain => ({
-            domain,
-            usage: dataUsage[domain]?.totalSize || 0,
-            hasTabs: (tabData[domain]?.tabs?.length || 0) > 0,
-        }));
+        const sortedDomains = Array.from(allDomains).sort((a, b) => {
+            const aHasTabs = tabData[a]?.tabs?.length > 0;
+            const bHasTabs = tabData[b]?.tabs?.length > 0;
 
-        const sitesWithTabs = allDomainsRanked.filter(d => d.hasTabs).sort((a, b) => b.usage - a.usage);
-        const sitesWithoutTabs = allDomainsRanked.filter(d => !d.hasTabs).sort((a, b) => b.usage - a.usage);
+            if (aHasTabs && !bHasTabs) return -1;
+            if (!aHasTabs && bHasTabs) return 1;
 
-        const sortedDomains = [...sitesWithTabs, ...sitesWithoutTabs];
+            return (dataUsage[b]?.totalSize || 0) - (dataUsage[a]?.totalSize || 0);
+        });
+
         let totalBytes = 0;
-        allDomainsRanked.forEach(d => totalBytes += d.usage);
-        elements.totalUsage.textContent = `Total: ${formatBytes(totalBytes)}`;
+        for (const domain of sortedDomains) {
+            totalBytes += dataUsage[domain]?.totalSize || 0;
+        }
 
         if (sortedDomains.length <= 4) {
-            sortedDomains.forEach(item => {
-                const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain]);
+            sortedDomains.forEach(domain => {
+                const usage = dataUsage[domain]?.totalSize || 0;
+                const siteEntry = createSingleSiteEntry(domain, usage, pausedDomains[domain], tabData[domain]);
                 elements.sitesContainer.appendChild(siteEntry);
             });
         } else {
-            const displayList = sortedDomains.slice(0, 3);
-            const others = sortedDomains.slice(3);
+            const topSites = sortedDomains.slice(0, 3);
+            const otherSites = sortedDomains.slice(3);
 
-            displayList.forEach(item => {
-                const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain]);
+            topSites.forEach(domain => {
+                const usage = dataUsage[domain]?.totalSize || 0;
+                const siteEntry = createSingleSiteEntry(domain, usage, pausedDomains[domain], tabData[domain]);
                 elements.sitesContainer.appendChild(siteEntry);
             });
 
-            const otherUsage = others.reduce((sum, item) => sum + item.usage, 0);
-            const compoundedEntry = createCompoundedSiteEntry(otherUsage, others.length);
-            elements.sitesContainer.appendChild(compoundedEntry);
+            const otherSitesUsage = otherSites.reduce((sum, domain) => sum + (dataUsage[domain]?.totalSize || 0), 0);
+            const compactedEntry = createCompactedEntry(otherSites, otherSitesUsage, dataUsage, pausedDomains, tabData);
+            elements.sitesContainer.appendChild(compactedEntry);
         }
+
+        elements.totalUsage.textContent = `Total: ${formatBytes(totalBytes)}`;
     }
 
     function createSingleSiteEntry(domain, usage, isPaused, domainTabData) {
@@ -164,9 +168,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     chrome.windows.update(topTab.windowId, { focused: true });
                     chrome.tabs.update(topTab.tabId, { active: true });
                 });
-
-                const progressBar = createProgressBar(usage, topTab.usage);
-                siteInfo.appendChild(progressBar);
             }
             siteDomain.appendChild(tabCountEl);
         }
@@ -189,65 +190,39 @@ document.addEventListener('DOMContentLoaded', () => {
         return siteEntry;
     }
 
-    function createProgressBar(totalUsage, topTabUsage) {
-        const progressBarContainer = document.createElement('div');
-        progressBarContainer.className = 'progress-bar-container';
+    function createCompactedEntry(sites, totalUsage, dataUsage, pausedDomains, tabData) {
+        const compactedEntry = document.createElement('div');
+        compactedEntry.className = 'compacted';
 
-        const totalBar = document.createElement('div');
-        totalBar.className = 'progress-bar total-bar';
+        const header = document.createElement('div');
+        header.className = 'header site-entry';
+        header.textContent = `Other sites (${sites.length}) - ${formatBytes(totalUsage)}`;
+        header.addEventListener('click', () => {
+            compactedEntry.classList.toggle('expanded');
+        });
+        compactedEntry.appendChild(header);
 
-        if (totalUsage > 0) {
-            const topTabPercentage = (topTabUsage / totalUsage) * 100;
-            const topTabEl = document.createElement('div');
-            topTabEl.className = 'progress-bar top-tab-bar';
-            topTabEl.style.width = `${topTabPercentage}%`;
-            totalBar.appendChild(topTabEl);
+        const details = document.createElement('div');
+        details.className = 'details';
+        for (const domain of sites) {
+            const usage = dataUsage[domain] ? dataUsage[domain].totalSize : 0;
+            const isPaused = pausedDomains[domain];
+            const siteEntry = createSingleSiteEntry(domain, usage, isPaused, tabData[domain]);
+            details.appendChild(siteEntry);
         }
-
-        progressBarContainer.appendChild(totalBar);
-        return progressBarContainer;
-    }
-
-    function createCompoundedSiteEntry(usage, count) {
-        const siteEntry = document.createElement('div');
-        siteEntry.className = 'site-entry';
-
-        const siteInfo = document.createElement('div');
-        siteInfo.className = 'site-info';
-
-        const siteDomain = document.createElement('div');
-        siteDomain.className = 'site-domain';
-        siteDomain.textContent = `Other sites (${count})`;
-        siteInfo.appendChild(siteDomain);
-
-        const siteUsage = document.createElement('div');
-        siteUsage.className = 'site-usage';
-        siteUsage.textContent = formatBytes(usage);
-        siteInfo.appendChild(siteUsage);
-
-        siteEntry.appendChild(siteInfo);
-        return siteEntry;
+        compactedEntry.appendChild(details);
+        return compactedEntry;
     }
 
     // --- Data & UI Updates ---
     async function updateUI() {
         elements.loadingMessage.style.display = 'block';
         const [storageData, tabInfo] = await Promise.all([
-            chrome.storage.local.get(['dataUsage', 'pausedDomains', 'lastMonthUsage', 'lastResetDate', 'settings']),
+            chrome.storage.local.get(['dataUsage', 'pausedDomains', 'lastMonthUsage']),
             chrome.runtime.sendMessage({ action: 'getTabInfo' })
         ]);
 
         renderSites(storageData.dataUsage, storageData.pausedDomains, tabInfo.tabData);
-
-        if (storageData.lastResetDate && storageData.settings) {
-            const lastReset = new Date(storageData.lastResetDate);
-            const now = new Date();
-            const daysSinceReset = Math.ceil((now - lastReset) / (1000 * 60 * 60 * 24));
-            const periodLength = parseInt(storageData.settings.resetPeriod, 10) || 30;
-
-            elements.sinceDateInfo.textContent = `Day ${daysSinceReset} of ${periodLength}`;
-        }
-
 
         if (storageData.lastMonthUsage) {
             const currentTotal = Object.values(storageData.dataUsage || {}).reduce((sum, site) => sum + (site.totalSize || 0), 0);
@@ -284,8 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.saveSetupBtn.addEventListener('click', () => {
         if (selectedResetDay) {
             const settings = { resetDay: selectedResetDay, resetPeriod: '30' };
-            const now = new Date().toISOString();
-            chrome.storage.local.set({ settings, isSetupComplete: true, lastResetDate: now }, () => {
+            chrome.storage.local.set({ settings, isSetupComplete: true }, () => {
                 initializeMainView();
             });
         }
