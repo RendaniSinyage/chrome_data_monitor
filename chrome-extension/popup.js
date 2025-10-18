@@ -150,23 +150,41 @@ document.addEventListener('DOMContentLoaded', () => {
         siteInfo.appendChild(siteDomain);
 
         if (domainTabData?.tabs?.length > 0) {
-            const tabCountEl = document.createElement('span');
-            tabCountEl.className = 'tab-count';
-            tabCountEl.textContent = `${domainTabData.tabs.length}`;
-
+            const tabCount = domainTabData.tabs.length;
             const topTab = domainTabData.topTab;
-            if (topTab) {
-                tabCountEl.classList.add('clickable');
-                tabCountEl.style.backgroundColor = getTabColor(topTab.tabId);
-                tabCountEl.title = `Top consumer: ${formatBytes(topTab.usage)}. Click to focus.`;
+
+            if (tabCount === 1) {
+                const tabCountEl = document.createElement('span');
+                tabCountEl.className = 'tab-count clickable';
+                tabCountEl.textContent = '1';
+                tabCountEl.style.backgroundColor = getTabColor(domainTabData.tabs[0].tabId);
+                tabCountEl.title = `Click to focus tab.`;
                 tabCountEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    chrome.windows.update(domainTabData.tabs[0].windowId, { focused: true });
+                    chrome.tabs.update(domainTabData.tabs[0].tabId, { active: true });
+                });
+                siteDomain.appendChild(tabCountEl);
+            } else if (topTab) {
+                const totalTabsEl = document.createElement('span');
+                totalTabsEl.className = 'tab-count total';
+                totalTabsEl.textContent = `${tabCount}`;
+                totalTabsEl.title = `${tabCount} tabs open`;
+                siteDomain.appendChild(totalTabsEl);
+
+                const topTabEl = document.createElement('span');
+                topTabEl.className = 'tab-count clickable';
+                const topTabIndex = domainTabData.tabs.findIndex(t => t.tabId === topTab.tabId) + 1;
+                topTabEl.textContent = `${topTabIndex}`;
+                topTabEl.style.backgroundColor = getTabColor(topTab.tabId);
+                topTabEl.title = `Top consumer (tab ${topTabIndex}): ${formatBytes(topTab.usage)}. Click to focus.`;
+                topTabEl.addEventListener('click', (e) => {
                     e.stopPropagation();
                     chrome.windows.update(topTab.windowId, { focused: true });
                     chrome.tabs.update(topTab.tabId, { active: true });
                 });
-
+                siteDomain.appendChild(topTabEl);
             }
-            siteDomain.appendChild(tabCountEl);
         }
 
         const siteUsage = document.createElement('div');

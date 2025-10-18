@@ -138,10 +138,17 @@ h1 {
     height: 18px;
 }
 
+.tab-count.total {
+    background-color: #bdc3c7;
+    cursor: default;
+    color: white;
+}
+
 .tab-count.clickable {
     cursor: pointer;
     text-decoration: none;
     color: white;
+    margin-left: 4px;
 }
 
 .tab-count.clickable:hover {
