@@ -57,11 +57,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const { settings } = await chrome.storage.local.get('settings');
         if (settings) {
-            alwaysCompareToggle.checked = settings.alwaysCompare || false;
+            alwaysCompareToggle.checked = settings.alwaysCompare !== false;
             resetDaySelect.value = settings.resetDay || 1;
             resetPeriodSelect.value = settings.resetPeriod || '30';
             autoPauseToggle.checked = settings.autoPauseEnabled !== false;
         } else {
+            alwaysCompareToggle.checked = true;
             autoPauseToggle.checked = true;
         }
 
