@@ -209,14 +209,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const count = others.length;
 
         const compoundedEntry = document.createElement('div');
-        compoundedEntry.className = 'site-entry compounded-entry';
+        compoundedEntry.className = 'compounded-entry';
 
         const siteInfo = document.createElement('div');
-        siteInfo.className = 'site-info';
+        siteInfo.className = 'site-entry';
         siteInfo.innerHTML = `
-            <div class="site-domain">Other sites (${count})</div>
-            <div class="site-usage">${formatBytes(usage)}</div>
+            <div class="site-info">
+                <div class="site-domain">Other sites (${count})</div>
+                <div class="site-usage">${formatBytes(usage)}</div>
+            </div>
         `;
+
+        const collapseBar = document.createElement('div');
+        collapseBar.className = 'collapse-bar';
+        collapseBar.textContent = `Total for "Other sites": ${formatBytes(usage)}`;
 
         const details = document.createElement('div');
         details.className = 'compounded-details';
@@ -227,11 +233,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         compoundedEntry.appendChild(siteInfo);
+        compoundedEntry.appendChild(collapseBar);
         compoundedEntry.appendChild(details);
 
-        siteInfo.addEventListener('click', () => {
-            compoundedEntry.classList.toggle('expanded');
-        });
+        const toggle = () => compoundedEntry.classList.toggle('expanded');
+        siteInfo.addEventListener('click', toggle);
+        collapseBar.addEventListener('click', toggle);
 
         return compoundedEntry;
     }
