@@ -130,8 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 elements.sitesContainer.appendChild(siteEntry);
             });
 
-            const otherUsage = others.reduce((sum, item) => sum + item.usage, 0);
-            const compoundedEntry = createCompoundedSiteEntry(otherUsage, others.length);
+            const compoundedEntry = createCompoundedSiteEntry(others, pausedDomains, tabData);
             elements.sitesContainer.appendChild(compoundedEntry);
         }
     }
@@ -205,25 +204,36 @@ document.addEventListener('DOMContentLoaded', () => {
         return siteEntry;
     }
 
-    function createCompoundedSiteEntry(usage, count) {
-        const siteEntry = document.createElement('div');
-        siteEntry.className = 'site-entry';
+    function createCompoundedSiteEntry(others, pausedDomains, tabData) {
+        const usage = others.reduce((sum, item) => sum + item.usage, 0);
+        const count = others.length;
+
+        const compoundedEntry = document.createElement('div');
+        compoundedEntry.className = 'site-entry compounded-entry';
 
         const siteInfo = document.createElement('div');
         siteInfo.className = 'site-info';
+        siteInfo.innerHTML = `
+            <div class="site-domain">Other sites (${count})</div>
+            <div class="site-usage">${formatBytes(usage)}</div>
+        `;
 
-        const siteDomain = document.createElement('div');
-        siteDomain.className = 'site-domain';
-        siteDomain.textContent = `Other sites (${count})`;
-        siteInfo.appendChild(siteDomain);
+        const details = document.createElement('div');
+        details.className = 'compounded-details';
 
-        const siteUsage = document.createElement('div');
-        siteUsage.className = 'site-usage';
-        siteUsage.textContent = formatBytes(usage);
-        siteInfo.appendChild(siteUsage);
+        others.forEach(item => {
+            const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain]);
+            details.appendChild(siteEntry);
+        });
 
-        siteEntry.appendChild(siteInfo);
-        return siteEntry;
+        compoundedEntry.appendChild(siteInfo);
+        compoundedEntry.appendChild(details);
+
+        siteInfo.addEventListener('click', () => {
+            compoundedEntry.classList.toggle('expanded');
+        });
+
+        return compoundedEntry;
     }
 
     // --- Data & UI Updates ---

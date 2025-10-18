@@ -24,6 +24,17 @@ body {
     align-items: center;
 }
 
+.title-container {
+    display: flex;
+    align-items: center;
+}
+
+.header-icon {
+    width: 24px;
+    height: 24px;
+    margin-right: 10px;
+}
+
 h1 {
     font-size: 1.4em;
     margin: 0;
@@ -367,4 +378,30 @@ h1 {
 
 #save-setup-btn:hover {
     background-color: #2980b9;
+}
+
+/* --- Compacted View --- */
+.compounded-entry .site-info {
+    cursor: pointer;
+    font-weight: bold;
+    width: 100%;
+}
+
+.compounded-details {
+    display: none;
+    padding-left: 20px;
+    background-color: #fdfdfd;
+}
+
+.compounded-entry.expanded .compounded-details {
+    display: block;
+}
+
+.compounded-entry.expanded .site-info {
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.compounded-details .site-entry {
+    border-bottom: none;
+    padding-left: 0;
 }
