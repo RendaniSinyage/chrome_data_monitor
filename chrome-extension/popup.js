@@ -222,16 +222,8 @@ document.addEventListener('DOMContentLoaded', () => {
         details.className = 'compounded-details';
 
         others.forEach(item => {
-            // Create a simplified entry for the details list
-            const detailEntry = document.createElement('div');
-            detailEntry.className = 'site-entry';
-            detailEntry.innerHTML = `
-                <div class="site-info">
-                    <div class="site-domain">${item.domain}</div>
-                    <div class="site-usage">${formatBytes(item.usage)}</div>
-                </div>
-            `;
-            details.appendChild(detailEntry);
+            const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain]);
+            details.appendChild(siteEntry);
         });
 
         compoundedEntry.appendChild(siteInfo);
@@ -354,6 +346,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         await loadSettings();
         await updateUI();
+
+        // Load credits content
+        try {
+            const response = await fetch('CREDITS.md');
+            const text = await response.text();
+            document.getElementById('credits-tab').innerHTML = `<div class="about-content">${text}</div>`;
+        } catch (e) {
+            console.error("Could not load credits:", e);
+            document.getElementById('credits-tab').innerHTML = `<div class="about-content"><p>Could not load credits.</p></div>`;
+        }
     }
 
     checkSetup();

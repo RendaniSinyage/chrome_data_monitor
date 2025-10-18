@@ -47,7 +47,9 @@
         </div>
         <div class="tab-container">
             <button class="tab-link active" data-tab="data-usage-tab">Usage</button>
+            <div class="tab-spacer"></div>
             <button class="tab-link" data-tab="about-tab">About</button>
+            <button class="tab-link" data-tab="credits-tab">Credits</button>
         </div>
         <div id="data-usage-tab" class="tab-content active">
             <div id="loading-message">Loading data...</div>
@@ -60,10 +62,10 @@
                 <p>This extension helps you monitor and control your data usage.</p>
                 <p>Version: <span id="version-number"></span></p>
                 <p>Browser: <span id="browser-version"></span></p>
-                <a href="CREDITS.md" target="_blank">Credits</a>
                 <button id="clear-data-btn" class="danger-btn">Clear All Data</button>
             </div>
         </div>
+        <div id="credits-tab" class="tab-content"></div>
     </div>
 
     <script src="popup.js"></script>

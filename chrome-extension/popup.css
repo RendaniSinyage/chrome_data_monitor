@@ -72,6 +72,10 @@ h1 {
     border-bottom: 1px solid #e0e0e0;
 }
 
+.tab-spacer {
+    flex-grow: 1;
+}
+
 .tab-link {
     padding: 10px 15px;
     cursor: pointer;
