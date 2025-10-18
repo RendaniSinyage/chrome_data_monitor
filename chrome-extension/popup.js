@@ -218,13 +218,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         renderSites(storageData.dataUsage, storageData.pausedDomains, tabInfo.tabData);
 
-        if (storageData.lastResetDate && storageData.settings) {
-            const lastReset = new Date(storageData.lastResetDate);
+        if (storageData.settings && storageData.settings.resetDay) {
             const now = new Date();
-            const daysSinceReset = Math.ceil((now - lastReset) / (1000 * 60 * 60 * 24));
+            const resetDay = storageData.settings.resetDay;
+
+            let periodStart = new Date(now.getFullYear(), now.getMonth(), resetDay);
+            if (now.getDate() < resetDay) {
+                // If today's date is before the reset day, the period started last month.
+                periodStart.setMonth(periodStart.getMonth() - 1);
+            }
+
+            const daysInPeriod = Math.ceil((now - periodStart) / (1000 * 60 * 60 * 24));
             const periodLength = parseInt(storageData.settings.resetPeriod, 10) || 30;
 
-            elements.sinceDateInfo.textContent = `Day ${daysSinceReset} of ${periodLength}`;
+            elements.sinceDateInfo.textContent = `Day ${daysInPeriod} of ${periodLength}`;
         }
 
 
