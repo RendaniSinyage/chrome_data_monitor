@@ -351,7 +351,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(chrome.runtime.getURL('CREDITS.md'));
             const text = await response.text();
-            document.getElementById('credits-tab').innerHTML = `<div class="about-content">${text}</div>`;
+            const converter = new showdown.Converter();
+            const html = converter.makeHtml(text);
+            document.getElementById('credits-tab').innerHTML = `<div class="about-content">${html}</div>`;
         } catch (e) {
             console.error("Could not load credits:", e);
             document.getElementById('credits-tab').innerHTML = `<div class="about-content"><p>Could not load credits.</p></div>`;
