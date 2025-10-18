@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const alwaysCompareToggle = document.getElementById('always-compare-toggle');
         const resetDaySelect = document.getElementById('reset-day-select');
         const resetPeriodSelect = document.getElementById('reset-period-select');
+        const autoPauseToggle = document.getElementById('auto-pause-toggle');
 
         // Populate reset day dropdown
         for (let i = 1; i <= 31; i++) {
@@ -54,9 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
             resetDaySelect.appendChild(option);
         }
 
-        const autoPauseToggle = document.getElementById('auto-pause-toggle');
-
-        const autoPauseToggle = document.getElementById('auto-pause-toggle');
         const { settings } = await chrome.storage.local.get('settings');
         if (settings) {
             alwaysCompareToggle.checked = settings.alwaysCompare || false;
