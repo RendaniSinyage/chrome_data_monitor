@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const topTabIndex = domainTabData.tabs.findIndex(t => t.tabId === topTab.tabId) + 1;
                 topTabEl.textContent = `${topTabIndex}`;
                 topTabEl.style.backgroundColor = getTabColor(topTab.tabId);
-                topTabEl.title = `Click to focus`;
+                topTabEl.title = `Top Consumer Tab`;
                 topTabEl.addEventListener('click', (e) => {
                     e.stopPropagation();
                     chrome.windows.update(topTab.windowId, { focused: true });
