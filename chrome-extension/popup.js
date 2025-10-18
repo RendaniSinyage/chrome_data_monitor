@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tabCountEl.className = 'tab-count clickable';
                 tabCountEl.textContent = '1';
                 tabCountEl.style.backgroundColor = getTabColor(domainTabData.tabs[0].tabId);
-                tabCountEl.title = `Click to focus tab.`;
+                tabCountEl.title = `Click to focus`;
                 tabCountEl.addEventListener('click', (e) => {
                     e.stopPropagation();
                     chrome.windows.update(domainTabData.tabs[0].windowId, { focused: true });
@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const topTabIndex = domainTabData.tabs.findIndex(t => t.tabId === topTab.tabId) + 1;
                 topTabEl.textContent = `${topTabIndex}`;
                 topTabEl.style.backgroundColor = getTabColor(topTab.tabId);
-                topTabEl.title = `Top consumer (tab ${topTabIndex}): ${formatBytes(topTab.usage)}. Click to focus.`;
+                topTabEl.title = `Click to focus`;
                 topTabEl.addEventListener('click', (e) => {
                     e.stopPropagation();
                     chrome.windows.update(topTab.windowId, { focused: true });
