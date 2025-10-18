@@ -1,4 +1,4 @@
-# Data Tracker Chrome Extension
+# Datafy Chrome Extension
 
 ## Goal
 

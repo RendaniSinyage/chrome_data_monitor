@@ -209,36 +209,37 @@ document.addEventListener('DOMContentLoaded', () => {
         const count = others.length;
 
         const compoundedEntry = document.createElement('div');
-        compoundedEntry.className = 'compounded-entry';
+        compoundedEntry.className = 'site-entry compounded-entry';
 
         const siteInfo = document.createElement('div');
-        siteInfo.className = 'site-entry';
+        siteInfo.className = 'site-info';
         siteInfo.innerHTML = `
-            <div class="site-info">
-                <div class="site-domain">Other sites (${count})</div>
-                <div class="site-usage">${formatBytes(usage)}</div>
-            </div>
+            <div class="site-domain">Other sites (${count})</div>
+            <div class="site-usage">${formatBytes(usage)}</div>
         `;
-
-        const collapseBar = document.createElement('div');
-        collapseBar.className = 'collapse-bar';
-        collapseBar.textContent = `Total for "Other sites": ${formatBytes(usage)}`;
 
         const details = document.createElement('div');
         details.className = 'compounded-details';
 
         others.forEach(item => {
-            const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain]);
-            details.appendChild(siteEntry);
+            // Create a simplified entry for the details list
+            const detailEntry = document.createElement('div');
+            detailEntry.className = 'site-entry';
+            detailEntry.innerHTML = `
+                <div class="site-info">
+                    <div class="site-domain">${item.domain}</div>
+                    <div class="site-usage">${formatBytes(item.usage)}</div>
+                </div>
+            `;
+            details.appendChild(detailEntry);
         });
 
         compoundedEntry.appendChild(siteInfo);
-        compoundedEntry.appendChild(collapseBar);
         compoundedEntry.appendChild(details);
 
-        const toggle = () => compoundedEntry.classList.toggle('expanded');
-        siteInfo.addEventListener('click', toggle);
-        collapseBar.addEventListener('click', toggle);
+        siteInfo.addEventListener('click', () => {
+            compoundedEntry.classList.toggle('expanded');
+        });
 
         return compoundedEntry;
     }

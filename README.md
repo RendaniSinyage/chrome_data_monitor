@@ -1,6 +1,6 @@
-# Data Tracker Chrome Extension
+# Datafy Chrome Extension
 
-Data Tracker is a Chrome extension that helps you monitor your data usage and take control of your browsing habits. It provides detailed insights into the data consumption of each website you visit, helping you identify data-hungry sites and manage your usage effectively.
+Datafy is a Chrome extension that helps you monitor your data usage and take control of your browsing habits. It provides detailed insights into the data consumption of each website you visit, helping you identify data-hungry sites and manage your usage effectively.
 
 ## Features
 
@@ -14,7 +14,7 @@ Data Tracker is a Chrome extension that helps you monitor your data usage and ta
 
 ### From the Chrome Web Store (Recommended)
 
-The easiest way to install Data Tracker is from the Chrome Web Store.
+The easiest way to install Datafy is from the Chrome Web Store.
 
 *(Note: This is a placeholder. The extension is not yet published on the Chrome Web Store.)*
 
@@ -27,14 +27,14 @@ To install the extension manually, follow these steps:
 3.  **Enable Developer Mode**: Turn on the "Developer mode" toggle in the top-right corner.
 4.  **Load Unpacked**: Click the "Load unpacked" button and select the `chrome-extension` directory from the downloaded code.
 
-The Data Tracker extension should now be installed and active in your browser.
+The Datafy extension should now be installed and active in your browser.
 
 ## Compatibility with Other Chromium Browsers
 
 This extension is built using standard WebExtension APIs and should be compatible with other Chromium-based browsers that support these APIs, such as:
 
 - **Microsoft Edge**: You can install the extension directly from the Chrome Web Store or by following the manual installation steps in Edge.
-- **Brave**: Brave supports Chrome extensions, and you can install Data Tracker from the Chrome Web Store or manually.
+- **Brave**: Brave supports Chrome extensions, and you can install Datafy from the Chrome Web Store or manually.
 - **Vivaldi**: Vivaldi is also compatible with Chrome extensions, and the installation process is the same.
 - **Opera**: Opera can install Chrome extensions with the help of the "Install Chrome Extensions" addon.
 
