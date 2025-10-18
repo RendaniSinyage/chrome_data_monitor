@@ -65,6 +65,25 @@ h1 {
     color: #2ecc71;
 }
 
+.arrow-icon {
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
+    margin-bottom: 2px;
+}
+
+.arrow-icon.inactive {
+    filter: grayscale(1) opacity(0.3);
+}
+
+.arrow-icon.active-red {
+    filter: invert(48%) sepia(85%) saturate(2358%) hue-rotate(334deg) brightness(93%) contrast(91%);
+}
+
+.arrow-icon.active-green {
+    filter: invert(65%) sepia(21%) saturate(952%) hue-rotate(85deg) brightness(94%) contrast(88%);
+}
+
 /* --- Tab Styles --- */
 .tab-container {
     display: flex;

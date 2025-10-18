@@ -263,19 +263,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const lastMonthTotal = storageData.lastMonthUsage || 0;
         if (lastMonthTotal > 0 || (storageData.settings && storageData.settings.alwaysCompare)) {
             const currentTotal = Object.values(storageData.dataUsage || {}).reduce((sum, site) => sum + (site.totalSize || 0), 0);
-            const percentageChange = lastMonthTotal > 0 ? ((currentTotal - lastMonthTotal) / lastMonthTotal * 100) : 100;
+            const percentageChange = lastMonthTotal > 0 ? ((currentTotal - lastMonthTotal) / lastMonthTotal * 100) : 0;
 
-            let comparisonText = `${Math.abs(percentageChange).toFixed(0)}%`;
-            elements.lastMonthComparison.className = 'comparison-text';
-
-            if (percentageChange > 0.1) {
-                elements.lastMonthComparison.classList.add('increase');
-                comparisonText = `&uarr; ${comparisonText}`;
-            } else if (percentageChange < -0.1) {
-                 elements.lastMonthComparison.classList.add('decrease');
-                 comparisonText = `&darr; ${comparisonText}`;
-            }
-            elements.lastMonthComparison.innerHTML = comparisonText;
+            elements.lastMonthComparison.innerHTML = `
+                <img src="arrow-up.svg" class="arrow-icon ${percentageChange > 0.1 ? 'active-red' : 'inactive'}">
+                <img src="arrow-down.svg" class="arrow-icon ${percentageChange < -0.1 ? 'active-green' : 'inactive'}">
+                <span>${Math.abs(percentageChange).toFixed(0)}%</span>
+            `;
         } else {
             elements.lastMonthComparison.textContent = '';
         }
