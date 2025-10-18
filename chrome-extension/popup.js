@@ -347,13 +347,52 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadSettings();
         await updateUI();
 
-        // Load credits content
+        // Load and render credits
         try {
             const response = await fetch(chrome.runtime.getURL('CREDITS.md'));
             const text = await response.text();
-            const converter = new showdown.Converter();
-            const html = converter.makeHtml(text);
-            document.getElementById('credits-tab').innerHTML = `<div class="about-content">${html}</div>`;
+            const creditsTab = document.getElementById('credits-tab');
+            creditsTab.innerHTML = ''; // Clear existing content
+
+            const container = document.createElement('div');
+            container.className = 'credits-container';
+
+            const header = document.createElement('p');
+            header.className = 'credits-header';
+            header.textContent = 'A big thank you to all the projects and people that made Datafy possible.';
+            container.appendChild(header);
+
+            const sections = text.split('### ');
+            sections.forEach(section => {
+                if (section.trim() === '') return;
+
+                const lines = section.split('\n');
+                const title = lines[0].trim();
+                const items = lines.slice(1).filter(line => line.startsWith('* '));
+
+                if (items.length > 0) {
+                    const card = document.createElement('div');
+                    card.className = 'credit-card';
+
+                    const cardTitle = document.createElement('h3');
+                    cardTitle.textContent = title;
+                    card.appendChild(cardTitle);
+
+                    const list = document.createElement('ul');
+                    const converter = new showdown.Converter();
+                    items.forEach(item => {
+                        const li = document.createElement('li');
+                        const html = converter.makeHtml(item.substring(2)); // Remove '* '
+                        li.innerHTML = html;
+                        list.appendChild(li);
+                    });
+                    card.appendChild(list);
+                    container.appendChild(card);
+                }
+            });
+
+            creditsTab.appendChild(container);
+
         } catch (e) {
             console.error("Could not load credits:", e);
             document.getElementById('credits-tab').innerHTML = `<div class="about-content"><p>Could not load credits.</p></div>`;
