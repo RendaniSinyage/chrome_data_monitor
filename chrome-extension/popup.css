@@ -74,6 +74,15 @@ h1 {
 
 .comparison-text span {
     margin-left: 4px;
+    font-weight: bold;
+}
+
+.comparison-text.increase span {
+    color: #e74c3c;
+}
+
+.comparison-text.decrease span {
+    color: #2ecc71;
 }
 
 #since-date-info {
