@@ -2,13 +2,15 @@
 let dataUsage = {};
 let serviceUsageMap = {};
 let pausedDomains = {};
+let autoPauseTimes = {};
 let isDirty = false;
 
 // --- Initialization ---
 const dataLoadedPromise = (async () => {
-    const result = await chrome.storage.local.get(['dataUsage', 'serviceUsageMap', 'pausedDomains']);
+    const result = await chrome.storage.local.get(['dataUsage', 'serviceUsageMap', 'pausedDomains', 'autoPauseTimes']);
     dataUsage = result.dataUsage || {};
     pausedDomains = result.pausedDomains || {};
+    autoPauseTimes = result.autoPauseTimes || {};
     if (result.serviceUsageMap) {
         for (const service in result.serviceUsageMap) {
             serviceUsageMap[service] = new Set(result.serviceUsageMap[service]);
@@ -39,6 +41,7 @@ async function saveData() {
             dataUsage,
             serviceUsageMap: serializableServiceUsageMap,
             pausedDomains,
+            autoPauseTimes,
         });
         isDirty = false;
     }
@@ -163,6 +166,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         pauseDomain: (req) => pauseDomain(req.domain),
         clearAllData: clearAllData,
         setAutoPause: (req) => setAutoPause(req.domain, req.time),
+        cancelAllAutoPauseAlarms: cancelAllAutoPauseAlarms,
     };
 
     const performAction = async () => {
@@ -177,6 +181,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
 });
 
+async function cancelAllAutoPauseAlarms() {
+    const allAlarms = await chrome.alarms.getAll();
+    const autoPauseAlarms = allAlarms.filter(alarm => alarm.name.startsWith('auto-pause-'));
+    for (const alarm of autoPauseAlarms) {
+        await chrome.alarms.clear(alarm.name);
+    }
+}
+
 async function setAutoPause(domain, time) {
     const [hours, minutes] = time.split(':');
     const now = new Date();
@@ -185,6 +197,9 @@ async function setAutoPause(domain, time) {
     if (alarmTime < now) {
         alarmTime.setDate(alarmTime.getDate() + 1);
     }
+
+    autoPauseTimes[domain] = time;
+    isDirty = true;
 
     chrome.alarms.create(`auto-pause-${domain}`, {
         when: alarmTime.getTime(),

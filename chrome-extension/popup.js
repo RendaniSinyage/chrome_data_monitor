@@ -54,11 +54,17 @@ document.addEventListener('DOMContentLoaded', () => {
             resetDaySelect.appendChild(option);
         }
 
+        const autoPauseToggle = document.getElementById('auto-pause-toggle');
+
+        const autoPauseToggle = document.getElementById('auto-pause-toggle');
         const { settings } = await chrome.storage.local.get('settings');
         if (settings) {
             alwaysCompareToggle.checked = settings.alwaysCompare || false;
             resetDaySelect.value = settings.resetDay || 1;
             resetPeriodSelect.value = settings.resetPeriod || '30';
+            autoPauseToggle.checked = settings.autoPauseEnabled !== false;
+        } else {
+            autoPauseToggle.checked = true;
         }
 
         function saveSettings() {
@@ -67,11 +73,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 newSettings.alwaysCompare = alwaysCompareToggle.checked;
                 newSettings.resetDay = parseInt(resetDaySelect.value, 10);
                 newSettings.resetPeriod = resetPeriodSelect.value;
+                newSettings.autoPauseEnabled = autoPauseToggle.checked;
                 chrome.storage.local.set({ settings: newSettings });
+
+                if (!newSettings.autoPauseEnabled) {
+                    chrome.runtime.sendMessage({ action: 'cancelAllAutoPauseAlarms' });
+                }
             });
         }
 
         alwaysCompareToggle.addEventListener('change', saveSettings);
+        autoPauseToggle.addEventListener('change', saveSettings);
         resetDaySelect.addEventListener('change', saveSettings);
         resetPeriodSelect.addEventListener('change', saveSettings);
     }
@@ -101,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return colors[index % colors.length];
     }
 
-    function renderSites(dataUsage, pausedDomains, tabData) {
+    function renderSites(dataUsage, pausedDomains, tabData, autoPauseTimes, settings) {
         elements.loadingMessage.style.display = 'none';
         elements.sitesContainer.innerHTML = '';
         const allDomains = new Set([...Object.keys(dataUsage || {}), ...Object.keys(pausedDomains || {})]);
@@ -128,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (sortedDomains.length <= 4) {
             sortedDomains.forEach(item => {
-                const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain]);
+                const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain], autoPauseTimes, settings);
                 elements.sitesContainer.appendChild(siteEntry);
             });
         } else {
@@ -136,16 +148,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const others = sortedDomains.slice(3);
 
             displayList.forEach(item => {
-                const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain]);
+                const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain], autoPauseTimes, settings);
                 elements.sitesContainer.appendChild(siteEntry);
             });
 
-            const compoundedEntry = createCompoundedSiteEntry(others, pausedDomains, tabData);
+            const compoundedEntry = createCompoundedSiteEntry(others, pausedDomains, tabData, autoPauseTimes, settings);
             elements.sitesContainer.appendChild(compoundedEntry);
         }
     }
 
-    function createSingleSiteEntry(domain, usage, isPaused, domainTabData) {
+    function createSingleSiteEntry(domain, usage, isPaused, domainTabData, autoPauseTimes, settings) {
         const siteEntry = document.createElement('div');
         siteEntry.className = 'site-entry';
         if (isPaused) siteEntry.classList.add('paused');
@@ -204,24 +216,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const siteControls = document.createElement('div');
         siteControls.className = 'site-controls';
 
-        const autoPauseBtn = document.createElement('button');
-        autoPauseBtn.textContent = 'Auto';
-        autoPauseBtn.className = 'auto-pause-btn';
-        siteControls.appendChild(autoPauseBtn);
+        if (settings && settings.autoPauseEnabled) {
+            const autoPauseBtn = document.createElement('button');
+            autoPauseBtn.textContent = 'Auto';
+            autoPauseBtn.className = 'auto-pause-btn';
+            siteControls.appendChild(autoPauseBtn);
 
-        const timeInput = document.createElement('input');
-        timeInput.type = 'time';
-        timeInput.className = 'time-input hidden';
-        siteControls.appendChild(timeInput);
+            const timeInput = document.createElement('input');
+            timeInput.type = 'time';
+            timeInput.className = 'time-input hidden';
+            siteControls.appendChild(timeInput);
 
-        autoPauseBtn.addEventListener('click', () => {
-            timeInput.classList.toggle('hidden');
-        });
+            if (autoPauseTimes && autoPauseTimes[domain]) {
+                autoPauseBtn.classList.add('highlight');
+                timeInput.value = autoPauseTimes[domain];
+            }
 
-        timeInput.addEventListener('change', () => {
-            chrome.runtime.sendMessage({ action: 'setAutoPause', domain: domain, time: timeInput.value });
-            timeInput.classList.add('hidden');
-        });
+            autoPauseBtn.addEventListener('click', () => {
+                timeInput.classList.toggle('hidden');
+            });
+
+            timeInput.addEventListener('change', () => {
+                chrome.runtime.sendMessage({ action: 'setAutoPause', domain: domain, time: timeInput.value });
+                timeInput.classList.add('hidden');
+                autoPauseBtn.classList.add('highlight');
+            });
+        }
 
         const pauseBtn = document.createElement('button');
         pauseBtn.textContent = isPaused ? 'Unpause' : 'Pause';
@@ -234,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return siteEntry;
     }
 
-    function createCompoundedSiteEntry(others, pausedDomains, tabData) {
+    function createCompoundedSiteEntry(others, pausedDomains, tabData, autoPauseTimes, settings) {
         const usage = others.reduce((sum, item) => sum + item.usage, 0);
         const count = others.length;
 
@@ -252,7 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
         details.className = 'compounded-details';
 
         others.forEach(item => {
-            const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain]);
+            const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain], autoPauseTimes, settings);
             details.appendChild(siteEntry);
         });
 
@@ -270,11 +290,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function updateUI() {
         elements.loadingMessage.style.display = 'block';
         const [storageData, tabInfo] = await Promise.all([
-            chrome.storage.local.get(['dataUsage', 'pausedDomains', 'lastMonthUsage', 'lastResetDate', 'settings']),
+            chrome.storage.local.get(['dataUsage', 'pausedDomains', 'lastMonthUsage', 'lastResetDate', 'settings', 'autoPauseTimes']),
             chrome.runtime.sendMessage({ action: 'getTabInfo' })
         ]);
 
-        renderSites(storageData.dataUsage, storageData.pausedDomains, tabInfo.tabData);
+        renderSites(storageData.dataUsage, storageData.pausedDomains, tabInfo.tabData, storageData.autoPauseTimes, storageData.settings);
 
         if (storageData.settings && storageData.settings.resetDay) {
             const now = new Date();

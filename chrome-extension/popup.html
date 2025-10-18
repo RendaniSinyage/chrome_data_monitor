@@ -26,7 +26,7 @@
                 <span id="last-month-comparison"></span>
                 <span id="since-date-info"></span>
                 <button id="settings-btn" class="icon-btn" title="Settings">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16"><path fill="none" d="M0 0h24v24H0z"/><path d="M12 1l9.5 5.5v11L12 23l-9.5-5.5v-11L12 1zm0 2.311L4.5 7.653v8.694l7.5 4.342 7.5-4.342V7.653L12 3.311zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
+                    <img src="settings-icon.svg" class="header-icon" alt="Settings icon">
                 </button>
             </div>
         </div>
@@ -67,6 +67,19 @@
                 </div>
                 <p class="setting-description">
                     When enabled, the comparison will be shown even if there is no data from the previous period (i.e., it will show 0%).
+                </p>
+            </div>
+            <div class="setting-card">
+                <h2>Auto-pause Sites</h2>
+                <div class="setting-row">
+                    <label for="auto-pause-toggle">Enable auto-pause feature</label>
+                    <label class="switch">
+                        <input type="checkbox" id="auto-pause-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <p class="setting-description">
+                    Enable this to see options for auto-pausing sites after a certain time.
                 </p>
             </div>
         </div>

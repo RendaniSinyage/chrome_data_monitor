@@ -255,6 +255,10 @@ h1 {
     background-color: #e67e22;
 }
 
+.auto-pause-btn.highlight {
+    background-color: #2ecc71;
+}
+
 .time-input {
     width: 100px;
     margin-right: 5px;
@@ -320,10 +324,9 @@ h1 {
     justify-content: center;
 }
 
-.icon-btn svg {
+.icon-btn {
     width: 20px;
     height: 20px;
-    fill: #7f8c8d;
 }
 
 .icon-btn:hover {
