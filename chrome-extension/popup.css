@@ -57,14 +57,6 @@ h1 {
     margin-left: 10px;
 }
 
-.comparison-text.increase {
-    color: #e74c3c;
-}
-
-.comparison-text.decrease {
-    color: #2ecc71;
-}
-
 .arrow-icon {
     width: 14px;
     height: 14px;
@@ -252,6 +244,24 @@ h1 {
 
 .unpause-btn:hover {
     background-color: #27ae60;
+}
+
+.auto-pause-btn {
+    background-color: #f39c12;
+    margin-right: 5px;
+}
+
+.auto-pause-btn:hover {
+    background-color: #e67e22;
+}
+
+.time-input {
+    width: 100px;
+    margin-right: 5px;
+}
+
+.time-input.hidden {
+    display: none;
 }
 
 .site-entry.paused .site-domain {

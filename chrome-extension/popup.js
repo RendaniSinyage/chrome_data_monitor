@@ -21,11 +21,24 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedResetDay = 1;
 
     // --- Settings ---
+    const settingsTab = document.querySelector('.tab-link[data-tab="settings-tab"]');
+    settingsTab.style.display = 'none';
+
     elements.settingsBtn.addEventListener('click', () => {
-        elements.tabLinks.forEach(l => l.classList.remove('active'));
-        elements.tabContents.forEach(c => c.classList.remove('active'));
-        document.querySelector('.tab-link[data-tab="settings-tab"]').classList.add('active');
-        document.getElementById('settings-tab').classList.add('active');
+        const settingsTabContent = document.getElementById('settings-tab');
+        if (settingsTab.classList.contains('active')) {
+            elements.tabLinks.forEach(l => l.classList.remove('active'));
+            elements.tabContents.forEach(c => c.classList.remove('active'));
+            document.querySelector('.tab-link[data-tab="data-usage-tab"]').classList.add('active');
+            document.getElementById('data-usage-tab').classList.add('active');
+            settingsTab.style.display = 'none';
+        } else {
+            elements.tabLinks.forEach(l => l.classList.remove('active'));
+            elements.tabContents.forEach(c => c.classList.remove('active'));
+            settingsTab.style.display = 'block';
+            settingsTab.classList.add('active');
+            settingsTabContent.classList.add('active');
+        }
     });
 
     async function loadSettings() {
@@ -190,6 +203,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const siteControls = document.createElement('div');
         siteControls.className = 'site-controls';
+
+        const autoPauseBtn = document.createElement('button');
+        autoPauseBtn.textContent = 'Auto';
+        autoPauseBtn.className = 'auto-pause-btn';
+        siteControls.appendChild(autoPauseBtn);
+
+        const timeInput = document.createElement('input');
+        timeInput.type = 'time';
+        timeInput.className = 'time-input hidden';
+        siteControls.appendChild(timeInput);
+
+        autoPauseBtn.addEventListener('click', () => {
+            timeInput.classList.toggle('hidden');
+        });
+
+        timeInput.addEventListener('change', () => {
+            chrome.runtime.sendMessage({ action: 'setAutoPause', domain: domain, time: timeInput.value });
+            timeInput.classList.add('hidden');
+        });
+
         const pauseBtn = document.createElement('button');
         pauseBtn.textContent = isPaused ? 'Unpause' : 'Pause';
         pauseBtn.className = isPaused ? 'unpause-btn' : 'pause-btn';
@@ -265,11 +298,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const currentTotal = Object.values(storageData.dataUsage || {}).reduce((sum, site) => sum + (site.totalSize || 0), 0);
             const percentageChange = lastMonthTotal > 0 ? ((currentTotal - lastMonthTotal) / lastMonthTotal * 100) : (currentTotal > 0 ? 100 : 0);
 
-            elements.lastMonthComparison.innerHTML = `
-                <img src="arrow-up.svg" class="arrow-icon ${percentageChange > 0.1 ? 'active-red' : 'inactive'}">
-                <img src="arrow-down.svg" class="arrow-icon ${percentageChange < -0.1 ? 'active-green' : 'inactive'}">
-                <span>${Math.abs(percentageChange).toFixed(0)}%</span>
-            `;
+            const comparisonSpan = document.createElement('span');
+            comparisonSpan.textContent = `${Math.abs(percentageChange).toFixed(0)}%`;
+
+            elements.lastMonthComparison.innerHTML = '';
+
+            if (percentageChange > 0.1) {
+                elements.lastMonthComparison.innerHTML = `<img src="arrow-up.svg" class="arrow-icon active-red"> <img src="arrow-down.svg" class="arrow-icon inactive">`;
+                comparisonSpan.style.color = '#e74c3c';
+            } else if (percentageChange < -0.1) {
+                elements.lastMonthComparison.innerHTML = `<img src="arrow-up.svg" class="arrow-icon inactive"> <img src="arrow-down.svg" class="arrow-icon active-green">`;
+                comparisonSpan.style.color = '#2ecc71';
+            } else {
+                elements.lastMonthComparison.innerHTML = `<img src="arrow-up.svg" class="arrow-icon inactive"> <img src="arrow-down.svg" class="arrow-icon inactive">`;
+            }
+            elements.lastMonthComparison.appendChild(comparisonSpan);
         } else {
             elements.lastMonthComparison.textContent = '';
         }

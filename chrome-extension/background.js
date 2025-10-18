@@ -162,6 +162,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         unpauseDomain: (req) => unpauseDomain(req.domain),
         pauseDomain: (req) => pauseDomain(req.domain),
         clearAllData: clearAllData,
+        setAutoPause: (req) => setAutoPause(req.domain, req.time),
     };
 
     const performAction = async () => {
@@ -175,6 +176,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     performAction();
     return true;
 });
+
+async function setAutoPause(domain, time) {
+    const [hours, minutes] = time.split(':');
+    const now = new Date();
+    const alarmTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+
+    if (alarmTime < now) {
+        alarmTime.setDate(alarmTime.getDate() + 1);
+    }
+
+    chrome.alarms.create(`auto-pause-${domain}`, {
+        when: alarmTime.getTime(),
+        periodInMinutes: 24 * 60
+    });
+}
 
 async function getTabInfo() {
     const tabs = await chrome.tabs.query({});
@@ -261,5 +277,8 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         if (now >= nextReset) {
             await clearAllData();
         }
+    } else if (alarm.name.startsWith('auto-pause-')) {
+        const domain = alarm.name.replace('auto-pause-', '');
+        await pauseDomain(domain);
     }
 });
