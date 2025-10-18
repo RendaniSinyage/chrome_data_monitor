@@ -263,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const lastMonthTotal = storageData.lastMonthUsage || 0;
         if (lastMonthTotal > 0 || (storageData.settings && storageData.settings.alwaysCompare)) {
             const currentTotal = Object.values(storageData.dataUsage || {}).reduce((sum, site) => sum + (site.totalSize || 0), 0);
-            const percentageChange = lastMonthTotal > 0 ? ((currentTotal - lastMonthTotal) / lastMonthTotal * 100) : 0;
+            const percentageChange = lastMonthTotal > 0 ? ((currentTotal - lastMonthTotal) / lastMonthTotal * 100) : (currentTotal > 0 ? 100 : 0);
 
             elements.lastMonthComparison.innerHTML = `
                 <img src="arrow-up.svg" class="arrow-icon ${percentageChange > 0.1 ? 'active-red' : 'inactive'}">

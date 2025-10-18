@@ -70,6 +70,11 @@ h1 {
     height: 16px;
     vertical-align: middle;
     margin-bottom: 2px;
+    margin-right: -4px;
+}
+
+.comparison-text span {
+    margin-left: 8px;
 }
 
 .arrow-icon.inactive {
