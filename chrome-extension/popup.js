@@ -349,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Load credits content
         try {
-            const response = await fetch('CREDITS.md');
+            const response = await fetch(chrome.runtime.getURL('CREDITS.md'));
             const text = await response.text();
             document.getElementById('credits-tab').innerHTML = `<div class="about-content">${text}</div>`;
         } catch (e) {
