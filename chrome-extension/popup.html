@@ -33,12 +33,42 @@
         <div class="tab-container">
             <button class="tab-link active" data-tab="data-usage-tab">Usage</button>
             <div class="tab-spacer"></div>
+            <button class="tab-link" data-tab="settings-tab">Settings</button>
             <button class="tab-link" data-tab="about-tab">About</button>
             <button class="tab-link" data-tab="credits-tab">Credits</button>
         </div>
         <div id="data-usage-tab" class="tab-content active">
             <div id="loading-message">Loading data...</div>
             <div id="sites-container"></div>
+        </div>
+        <div id="settings-tab" class="tab-content">
+            <div class="setting-card">
+                <h2>Data Reset</h2>
+                <div class="setting-row">
+                    <label for="reset-day-select">Reset day</label>
+                    <select id="reset-day-select"></select>
+                </div>
+                <div class="setting-row">
+                    <label for="reset-period-select">Reset period</label>
+                    <select id="reset-period-select">
+                        <option value="30">Monthly</option>
+                        <option value="7">Weekly</option>
+                    </select>
+                </div>
+            </div>
+            <div class="setting-card">
+                <h2>Data Comparison</h2>
+                <div class="setting-row">
+                    <label for="always-compare-toggle">Always show comparison vs. last period</label>
+                    <label class="switch">
+                        <input type="checkbox" id="always-compare-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <p class="setting-description">
+                    When enabled, the comparison will be shown even if there is no data from the previous period (i.e., it will show 0%).
+                </p>
+            </div>
         </div>
         <div id="about-tab" class="tab-content">
             <div class="about-content">

@@ -30,6 +30,5 @@
   },
   "host_permissions": [
     "<all_urls>"
-  ],
-  "options_page": "settings.html"
+  ]
 }

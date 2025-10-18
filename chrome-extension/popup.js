@@ -22,11 +22,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Settings ---
     elements.settingsBtn.addEventListener('click', () => {
-        chrome.runtime.openOptionsPage ? chrome.runtime.openOptionsPage() : window.open(chrome.runtime.getURL('settings.html'));
+        elements.tabLinks.forEach(l => l.classList.remove('active'));
+        elements.tabContents.forEach(c => c.classList.remove('active'));
+        document.querySelector('.tab-link[data-tab="settings-tab"]').classList.add('active');
+        document.getElementById('settings-tab').classList.add('active');
     });
 
     async function loadSettings() {
-        // This function is now empty as settings are managed on the settings page
+        const alwaysCompareToggle = document.getElementById('always-compare-toggle');
+        const resetDaySelect = document.getElementById('reset-day-select');
+        const resetPeriodSelect = document.getElementById('reset-period-select');
+
+        // Populate reset day dropdown
+        for (let i = 1; i <= 31; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = i;
+            resetDaySelect.appendChild(option);
+        }
+
+        const { settings } = await chrome.storage.local.get('settings');
+        if (settings) {
+            alwaysCompareToggle.checked = settings.alwaysCompare || false;
+            resetDaySelect.value = settings.resetDay || 1;
+            resetPeriodSelect.value = settings.resetPeriod || '30';
+        }
+
+        function saveSettings() {
+            chrome.storage.local.get(['settings'], (result) => {
+                const newSettings = result.settings || {};
+                newSettings.alwaysCompare = alwaysCompareToggle.checked;
+                newSettings.resetDay = parseInt(resetDaySelect.value, 10);
+                newSettings.resetPeriod = resetPeriodSelect.value;
+                chrome.storage.local.set({ settings: newSettings });
+            });
+        }
+
+        alwaysCompareToggle.addEventListener('change', saveSettings);
+        resetDaySelect.addEventListener('change', saveSettings);
+        resetPeriodSelect.addEventListener('change', saveSettings);
     }
 
     // --- Tab Switching ---
@@ -231,14 +265,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const currentTotal = Object.values(storageData.dataUsage || {}).reduce((sum, site) => sum + (site.totalSize || 0), 0);
             const percentageChange = lastMonthTotal > 0 ? ((currentTotal - lastMonthTotal) / lastMonthTotal * 100) : 100;
 
-            let comparisonText = `${Math.abs(percentageChange).toFixed(0)}% vs last month`;
+            let comparisonText = `${Math.abs(percentageChange).toFixed(0)}%`;
             elements.lastMonthComparison.className = 'comparison-text';
 
             if (percentageChange > 0.1) {
                 elements.lastMonthComparison.classList.add('increase');
-                comparisonText = `+${comparisonText}`;
+                comparisonText = `⬆ ${comparisonText}`;
             } else if (percentageChange < -0.1) {
                  elements.lastMonthComparison.classList.add('decrease');
+                 comparisonText = `⬇ ${comparisonText}`;
             }
             elements.lastMonthComparison.textContent = comparisonText;
         } else {
