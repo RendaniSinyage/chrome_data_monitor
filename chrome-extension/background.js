@@ -5,18 +5,7 @@ let pausedDomains = {};
 let isDirty = false;
 
 // --- Initialization ---
-chrome.runtime.onStartup.addListener(loadInitialData);
-
-chrome.runtime.onInstalled.addListener((details) => {
-    loadInitialData();
-    chrome.alarms.create('dataSaver', { periodInMinutes: 1 / 30 });
-    chrome.alarms.create('dailyResetChecker', { periodInMinutes: 60 });
-    if (details.reason === 'install') {
-        chrome.storage.local.set({ isSetupComplete: false });
-    }
-});
-
-async function loadInitialData() {
+const dataLoadedPromise = (async () => {
     const result = await chrome.storage.local.get(['dataUsage', 'serviceUsageMap', 'pausedDomains']);
     dataUsage = result.dataUsage || {};
     pausedDomains = result.pausedDomains || {};
@@ -25,7 +14,19 @@ async function loadInitialData() {
             serviceUsageMap[service] = new Set(result.serviceUsageMap[service]);
         }
     }
-}
+})();
+
+chrome.runtime.onStartup.addListener(() => {
+    // Data is already being loaded by the top-level promise
+});
+
+chrome.runtime.onInstalled.addListener((details) => {
+    chrome.alarms.create('dataSaver', { periodInMinutes: 1 / 30 });
+    chrome.alarms.create('dailyResetChecker', { periodInMinutes: 60 });
+    if (details.reason === 'install') {
+        chrome.storage.local.set({ isSetupComplete: false });
+    }
+});
 
 // --- Throttled Data Saving ---
 async function saveData() {
@@ -55,6 +56,7 @@ function simpleHash(str) {
 
 // --- Pause/Unpause Logic ---
 async function pauseDomain(domain) {
+    await dataLoadedPromise;
     if (pausedDomains[domain]) return;
     pausedDomains[domain] = true;
 
@@ -72,6 +74,7 @@ async function pauseDomain(domain) {
 }
 
 async function unpauseDomain(domain) {
+    await dataLoadedPromise;
     if (!pausedDomains[domain]) return;
     delete pausedDomains[domain];
 
@@ -84,6 +87,7 @@ async function unpauseDomain(domain) {
 // --- Core Data Tracking Logic ---
 chrome.webRequest.onCompleted.addListener(
   async (details) => {
+    await dataLoadedPromise;
     const { initiator, url, responseHeaders, tabId } = details;
 
     // Ignore requests from the extension itself
@@ -159,10 +163,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         pauseDomain: (req) => pauseDomain(req.domain),
         clearAllData: clearAllData,
     };
-    if (actions[request.action]) {
-        actions[request.action](request).then(sendResponse);
-        return true;
-    }
+
+    const performAction = async () => {
+        await dataLoadedPromise;
+        if (actions[request.action]) {
+            const result = await actions[request.action](request);
+            sendResponse(result);
+        }
+    };
+
+    performAction();
+    return true;
 });
 
 async function getTabInfo() {
@@ -207,28 +218,48 @@ async function getTabInfo() {
 // --- Data Reset Logic ---
 async function clearAllData() {
     const totalUsage = Object.values(dataUsage).reduce((sum, site) => sum + site.totalSize, 0);
-    await chrome.storage.local.set({ lastMonthUsage: totalUsage });
 
     dataUsage = {};
     serviceUsageMap = {};
-    isDirty = true;
-    await saveData();
-    await chrome.storage.local.set({ lastResetDate: new Date().toISOString() });
+    isDirty = false;
+
+    await chrome.storage.local.set({
+        lastMonthUsage: totalUsage,
+        dataUsage: {},
+        serviceUsageMap: {},
+        lastResetDate: new Date().toISOString()
+    });
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+    await dataLoadedPromise;
     if (alarm.name === 'dataSaver') {
         saveData();
     } else if (alarm.name === 'dailyResetChecker') {
         const { settings, lastResetDate } = await chrome.storage.local.get(['settings', 'lastResetDate']);
-        if (!settings?.resetDay) return;
+        if (!settings || !settings.resetDay) return;
 
         const now = new Date();
-        const lastReset = lastResetDate ? new Date(lastResetDate) : new Date(0);
-        const daysSinceReset = (now - lastReset) / (1000 * 60 * 60 * 24);
+        // If there's no last reset date, set it to now and exit.
+        if (!lastResetDate) {
+            await chrome.storage.local.set({ lastResetDate: now.toISOString() });
+            return;
+        }
 
-        if (now.getDate() == settings.resetDay && daysSinceReset > 25) {
-             await clearAllData();
+        const lastReset = new Date(lastResetDate);
+        let nextReset = new Date(lastReset);
+
+        // Calculate next reset date, ensuring it's in the future
+        if (now.getDate() >= settings.resetDay) {
+            nextReset.setMonth(now.getMonth() + 1);
+            nextReset.setDate(settings.resetDay);
+        } else {
+            nextReset.setDate(settings.resetDay);
+        }
+
+        // If the calculated next reset is in the past, it means we are in the next cycle
+        if (now >= nextReset) {
+            await clearAllData();
         }
     }
 });
