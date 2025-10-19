@@ -69,6 +69,12 @@ document.addEventListener('DOMContentLoaded', () => {
             autoPauseTimeDefault.value = '00:00';
         }
 
+        function toggleDefaultTimeVisibility() {
+            autoPauseTimeDefault.parentElement.style.display = autoPauseToggle.checked ? 'flex' : 'none';
+        }
+
+        toggleDefaultTimeVisibility();
+
         function saveSettings() {
             chrome.storage.local.get(['settings'], (result) => {
                 const newSettings = result.settings || {};
@@ -86,7 +92,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         alwaysCompareToggle.addEventListener('change', saveSettings);
-        autoPauseToggle.addEventListener('change', saveSettings);
+        autoPauseToggle.addEventListener('change', () => {
+            saveSettings();
+            toggleDefaultTimeVisibility();
+        });
         autoPauseTimeDefault.addEventListener('change', saveSettings);
         resetDaySelect.addEventListener('change', saveSettings);
         resetPeriodSelect.addEventListener('change', saveSettings);
@@ -117,10 +126,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return colors[index % colors.length];
     }
 
-    function renderSites(dataUsage, pausedDomains, tabData, autoPauseTimes, settings) {
+    function renderSites(dataUsage, pausedDomains, softPausedDomains, tabData, autoPauseTimes, settings) {
         elements.loadingMessage.style.display = 'none';
         elements.sitesContainer.innerHTML = '';
-        const allDomains = new Set([...Object.keys(dataUsage || {}), ...Object.keys(pausedDomains || {})]);
+        const allDomains = new Set([...Object.keys(dataUsage || {}), ...Object.keys(pausedDomains || {}), ...Object.keys(softPausedDomains || {})]);
 
         if (allDomains.size === 0) {
             elements.sitesContainer.innerHTML = '<div class="site-entry"><div class="site-info">No data tracked yet. Browse some sites to see usage.</div></div>';
@@ -144,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (sortedDomains.length <= 4) {
             sortedDomains.forEach(item => {
-                const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain], autoPauseTimes, settings);
+                const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], softPausedDomains[item.domain], tabData[item.domain], autoPauseTimes, settings);
                 elements.sitesContainer.appendChild(siteEntry);
             });
         } else {
@@ -152,16 +161,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const others = sortedDomains.slice(3);
 
             displayList.forEach(item => {
-                const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain], autoPauseTimes, settings);
+                const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], softPausedDomains[item.domain], tabData[item.domain], autoPauseTimes, settings);
                 elements.sitesContainer.appendChild(siteEntry);
             });
 
-            const compoundedEntry = createCompoundedSiteEntry(others, pausedDomains, tabData, autoPauseTimes, settings);
+            const compoundedEntry = createCompoundedSiteEntry(others, pausedDomains, softPausedDomains, tabData, autoPauseTimes, settings);
             elements.sitesContainer.appendChild(compoundedEntry);
         }
     }
 
-    function createSingleSiteEntry(domain, usage, isPaused, domainTabData, autoPauseTimes, settings) {
+    function createSingleSiteEntry(domain, usage, isPaused, isSoftPaused, domainTabData, autoPauseTimes, settings) {
         const siteEntry = document.createElement('div');
         siteEntry.className = 'site-entry';
         if (isPaused) siteEntry.classList.add('paused');
@@ -249,6 +258,23 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        const softPauseBtn = document.createElement('button');
+        softPauseBtn.textContent = 'Soft Pause';
+        softPauseBtn.className = 'soft-pause-btn';
+        if (isSoftPaused) {
+            softPauseBtn.classList.add('highlight');
+        }
+        softPauseBtn.onclick = () => {
+            chrome.runtime.sendMessage({ action: 'toggleSoftPause', domain }, (response) => {
+                if (response.isSoftPaused) {
+                    softPauseBtn.classList.add('highlight');
+                } else {
+                    softPauseBtn.classList.remove('highlight');
+                }
+            });
+        };
+        siteControls.appendChild(softPauseBtn);
+
         const pauseBtn = document.createElement('button');
         pauseBtn.textContent = isPaused ? 'Unpause' : 'Pause';
         pauseBtn.className = isPaused ? 'unpause-btn' : 'pause-btn';
@@ -260,7 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return siteEntry;
     }
 
-    function createCompoundedSiteEntry(others, pausedDomains, tabData, autoPauseTimes, settings) {
+    function createCompoundedSiteEntry(others, pausedDomains, softPausedDomains, tabData, autoPauseTimes, settings) {
         const usage = others.reduce((sum, item) => sum + item.usage, 0);
         const count = others.length;
 
@@ -278,7 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
         details.className = 'compounded-details';
 
         others.forEach(item => {
-            const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain], autoPauseTimes, settings);
+            const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], softPausedDomains[item.domain], tabData[item.domain], autoPauseTimes, settings);
             details.appendChild(siteEntry);
         });
 
@@ -296,11 +322,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function updateUI() {
         elements.loadingMessage.style.display = 'block';
         const [storageData, tabInfo] = await Promise.all([
-            chrome.storage.local.get(['dataUsage', 'pausedDomains', 'lastMonthUsage', 'lastResetDate', 'settings', 'autoPauseTimes']),
+            chrome.storage.local.get(['dataUsage', 'pausedDomains', 'softPausedDomains', 'lastMonthUsage', 'lastResetDate', 'settings', 'autoPauseTimes']),
             chrome.runtime.sendMessage({ action: 'getTabInfo' })
         ]);
 
-        renderSites(storageData.dataUsage, storageData.pausedDomains, tabInfo.tabData, storageData.autoPauseTimes, storageData.settings);
+        renderSites(storageData.dataUsage, storageData.pausedDomains, storageData.softPausedDomains, tabInfo.tabData, storageData.autoPauseTimes, storageData.settings);
 
         if (storageData.settings && storageData.settings.resetDay) {
             const now = new Date();

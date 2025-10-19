@@ -2,14 +2,16 @@
 let dataUsage = {};
 let serviceUsageMap = {};
 let pausedDomains = {};
+let softPausedDomains = {};
 let autoPauseTimes = {};
 let isDirty = false;
 
 // --- Initialization ---
 const dataLoadedPromise = (async () => {
-    const result = await chrome.storage.local.get(['dataUsage', 'serviceUsageMap', 'pausedDomains', 'autoPauseTimes']);
+    const result = await chrome.storage.local.get(['dataUsage', 'serviceUsageMap', 'pausedDomains', 'softPausedDomains', 'autoPauseTimes']);
     dataUsage = result.dataUsage || {};
     pausedDomains = result.pausedDomains || {};
+    softPausedDomains = result.softPausedDomains || {};
     autoPauseTimes = result.autoPauseTimes || {};
     if (result.serviceUsageMap) {
         for (const service in result.serviceUsageMap) {
@@ -41,6 +43,7 @@ async function saveData() {
             dataUsage,
             serviceUsageMap: serializableServiceUsageMap,
             pausedDomains,
+            softPausedDomains,
             autoPauseTimes,
         });
         isDirty = false;
@@ -164,6 +167,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         getTabInfo: getTabInfo,
         unpauseDomain: (req) => unpauseDomain(req.domain),
         pauseDomain: (req) => pauseDomain(req.domain),
+        toggleSoftPause: (req) => toggleSoftPause(req.domain),
         clearAllData: clearAllData,
         setAutoPause: (req) => setAutoPause(req.domain, req.time),
         cancelAllAutoPauseAlarms: cancelAllAutoPauseAlarms,
@@ -180,6 +184,43 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     performAction();
     return true;
 });
+
+async function toggleSoftPause(domain) {
+    softPausedDomains[domain] = !softPausedDomains[domain];
+    isDirty = true;
+    await saveData();
+    await updateSoftPauseRules();
+    return { isSoftPaused: softPausedDomains[domain] };
+}
+
+async function updateSoftPauseRules() {
+    const allTabs = await chrome.tabs.query({});
+    const rulesToRemove = [];
+    const rulesToAdd = [];
+
+    for (const domain in softPausedDomains) {
+        if (softPausedDomains[domain]) {
+            const domainTabs = allTabs.filter(tab => tab.url && new URL(tab.url).hostname === domain);
+            const activeTab = domainTabs.find(tab => tab.active);
+
+            const ruleId = simpleHash(`soft-pause-${domain}`);
+            rulesToRemove.push(ruleId);
+
+            if (activeTab) {
+                rulesToAdd.push({
+                    id: ruleId,
+                    priority: 2,
+                    action: { type: 'allow' },
+                    condition: { tabIds: [activeTab.id], resourceTypes: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'object', 'xmlhttprequest', 'other'] }
+                });
+            }
+        }
+    }
+    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: rulesToRemove, addRules: rulesToAdd });
+}
+
+chrome.tabs.onActivated.addListener(updateSoftPauseRules);
+chrome.tabs.onRemoved.addListener(updateSoftPauseRules);
 
 async function cancelAllAutoPauseAlarms() {
     const allAlarms = await chrome.alarms.getAll();

@@ -259,6 +259,21 @@ h1 {
     background-color: #2ecc71;
 }
 
+.soft-pause-btn {
+    background-color: #9b59b6;
+    margin-right: 5px;
+}
+
+.soft-pause-btn:hover {
+    background-color: #8e44ad;
+}
+
+.soft-pause-btn.highlight {
+    background-color: #3498db;
+    color: white;
+}
+
+
 .time-input {
     width: 100px;
     margin-right: 5px;
@@ -415,7 +430,7 @@ h1 {
 .setting-card {
     border: 1px solid #e0e0e0;
     border-radius: 8px;
-    padding: 15px;
+    padding: 10px 15px;
     margin-bottom: 15px;
 }
 
