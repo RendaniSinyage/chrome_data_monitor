@@ -327,6 +327,7 @@ h1 {
 .icon-btn {
     width: 20px;
     height: 20px;
+    fill: #7f8c8d;
 }
 
 .icon-btn:hover {
