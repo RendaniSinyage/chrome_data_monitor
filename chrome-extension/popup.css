@@ -264,6 +264,7 @@ h1 {
     display: none;
 }
 
+
 .site-entry.paused .site-domain {
     text-decoration: line-through;
     color: #95a5a6;
@@ -414,11 +415,26 @@ h1 {
     background-color: #2980b9;
 }
 
+#settings-tab .tab-content-scroll {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
 .setting-card {
     border: 1px solid #e0e0e0;
     border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 20px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-sizing: border-box;
+}
+
+.setting-card:first-child {
+    width: 100%;
+}
+
+.setting-card:not(:first-child) {
+    width: calc(50% - 8px);
 }
 
 .setting-card h2 {

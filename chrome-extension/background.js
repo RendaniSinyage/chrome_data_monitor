@@ -155,6 +155,55 @@ chrome.webRequest.onCompleted.addListener(
 );
 
 
+// --- Soft Pause Logic ---
+async function updateSoftPauseRules() {
+    const { settings } = await chrome.storage.local.get('settings');
+    if (!settings || !settings.softPauseEnabled) return;
+
+    const tabs = await chrome.tabs.query({ active: true });
+    const activeDomains = new Set(tabs.map(tab => {
+        try {
+            return new URL(tab.url).hostname;
+        } catch {
+            return null;
+        }
+    }).filter(Boolean));
+
+    const allTabs = await chrome.tabs.query({});
+    const allDomains = new Set(allTabs.map(tab => {
+        try {
+            return new URL(tab.url).hostname;
+        } catch {
+            return null;
+        }
+    }).filter(Boolean));
+
+    const rulesToRemove = [];
+    const rulesToAdd = [];
+
+    for (const domain of allDomains) {
+        const ruleId = simpleHash(`soft-pause-${domain}`);
+        if (activeDomains.has(domain)) {
+            rulesToRemove.push(ruleId);
+        } else {
+            rulesToAdd.push({
+                id: ruleId,
+                priority: 2,
+                action: { type: 'block' },
+                condition: { resourceTypes: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'object', 'xmlhttprequest', 'other'], urlFilter: `||${domain}/` }
+            });
+        }
+    }
+
+    if (rulesToRemove.length > 0) {
+        await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: rulesToRemove });
+    }
+    if (rulesToAdd.length > 0) {
+        await chrome.declarativeNetRequest.updateDynamicRules({ addRules: rulesToAdd });
+    }
+}
+
+
 // --- Message Handling ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const actions = {
@@ -163,6 +212,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         pauseDomain: (req) => pauseDomain(req.domain),
         clearAllData: clearAllData,
         setAutoPause: (req) => setAutoPause(req.domain, req.time),
+        toggleSoftPauseGlobal: (req) => {
+            if (req.enabled) {
+                chrome.tabs.onActivated.addListener(updateSoftPauseRules);
+                chrome.tabs.onUpdated.addListener(updateSoftPauseRules);
+                updateSoftPauseRules();
+            } else {
+                chrome.tabs.onActivated.removeListener(updateSoftPauseRules);
+                chrome.tabs.onUpdated.removeListener(updateSoftPauseRules);
+                // remove all soft pause rules
+                chrome.declarativeNetRequest.getDynamicRules((rules) => {
+                    const ruleIds = rules.filter(r => r.id.startsWith('soft-pause-')).map(r => r.id);
+                    chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: ruleIds });
+                });
+            }
+        },
     };
 
     const performAction = async () => {

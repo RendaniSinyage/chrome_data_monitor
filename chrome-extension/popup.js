@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const alwaysCompareToggle = document.getElementById('always-compare-toggle');
         const resetDaySelect = document.getElementById('reset-day-select');
         const resetPeriodSelect = document.getElementById('reset-period-select');
+        const softPauseToggle = document.getElementById('soft-pause-toggle');
 
         // Populate reset day dropdown
         for (let i = 1; i <= 31; i++) {
@@ -59,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alwaysCompareToggle.checked = settings.alwaysCompare || false;
             resetDaySelect.value = settings.resetDay || 1;
             resetPeriodSelect.value = settings.resetPeriod || '30';
+            softPauseToggle.checked = settings.softPauseEnabled || false;
         }
 
         function saveSettings() {
@@ -67,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 newSettings.alwaysCompare = alwaysCompareToggle.checked;
                 newSettings.resetDay = parseInt(resetDaySelect.value, 10);
                 newSettings.resetPeriod = resetPeriodSelect.value;
+                newSettings.softPauseEnabled = softPauseToggle.checked;
                 chrome.storage.local.set({ settings: newSettings });
             });
         }
@@ -74,6 +77,10 @@ document.addEventListener('DOMContentLoaded', () => {
         alwaysCompareToggle.addEventListener('change', saveSettings);
         resetDaySelect.addEventListener('change', saveSettings);
         resetPeriodSelect.addEventListener('change', saveSettings);
+        softPauseToggle.addEventListener('change', () => {
+            saveSettings();
+            chrome.runtime.sendMessage({ action: 'toggleSoftPauseGlobal', enabled: softPauseToggle.checked });
+        });
     }
 
     // --- Tab Switching ---

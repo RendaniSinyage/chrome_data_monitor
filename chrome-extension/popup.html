@@ -42,9 +42,10 @@
             <div id="sites-container"></div>
         </div>
         <div id="settings-tab" class="tab-content">
-            <div class="setting-card">
-                <h2>Data Reset</h2>
-                <div class="setting-row">
+            <div class="tab-content-scroll">
+                <div class="setting-card">
+                    <h2>Data Reset</h2>
+                    <div class="setting-row">
                     <label for="reset-day-select">Reset day</label>
                     <select id="reset-day-select"></select>
                 </div>
@@ -68,6 +69,20 @@
                 <p class="setting-description">
                     When enabled, the comparison will be shown even if there is no data from the previous period (i.e., it will show 0%).
                 </p>
+            </div>
+            <div class="setting-card">
+                <h2>Soft Pause</h2>
+                <div class="setting-row">
+                    <label for="soft-pause-toggle">Enable soft pause</label>
+                    <label class="switch">
+                        <input type="checkbox" id="soft-pause-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <p class="setting-description">
+                    When enabled, all inactive tabs will be paused to save data.
+                </p>
+            </div>
             </div>
         </div>
         <div id="about-tab" class="tab-content">
