@@ -1,159 +1,357 @@
-// --- Data and State Management ---
-const domainDataUsage = {};
-const backgroundActivity = {};
+// --- State Management ---
+let dataUsage = {};
+let serviceUsageMap = {};
+let pausedDomains = {};
+let isDirty = false;
 
 // --- Initialization ---
-chrome.runtime.onStartup.addListener(() => {
-    loadInitialData();
-});
-
-chrome.runtime.onInstalled.addListener(() => {
-    loadInitialData();
-    chrome.alarms.create('backgroundActivityChecker', { periodInMinutes: 1 });
-});
-
-function loadInitialData() {
-    chrome.storage.local.get('dataUsage', (result) => {
-        if (result.dataUsage) {
-            Object.assign(domainDataUsage, result.dataUsage);
+const dataLoadedPromise = (async () => {
+    const result = await chrome.storage.local.get(['dataUsage', 'serviceUsageMap', 'pausedDomains']);
+    dataUsage = result.dataUsage || {};
+    pausedDomains = result.pausedDomains || {};
+    if (result.serviceUsageMap) {
+        for (const service in result.serviceUsageMap) {
+            serviceUsageMap[service] = new Set(result.serviceUsageMap[service]);
         }
-    });
+    }
+})();
+
+chrome.runtime.onStartup.addListener(() => {
+    // Data is already being loaded by the top-level promise
+});
+
+chrome.runtime.onInstalled.addListener((details) => {
+    chrome.alarms.create('dataSaver', { periodInMinutes: 1 / 30 });
+    chrome.alarms.create('dailyResetChecker', { periodInMinutes: 60 });
+    if (details.reason === 'install') {
+        chrome.storage.local.set({ isSetupComplete: false });
+    }
+});
+
+// --- Throttled Data Saving ---
+async function saveData() {
+    if (isDirty) {
+        const serializableServiceUsageMap = {};
+        for (const service in serviceUsageMap) {
+            serializableServiceUsageMap[service] = Array.from(serviceUsageMap[service]);
+        }
+        await chrome.storage.local.set({
+            dataUsage,
+            serviceUsageMap: serializableServiceUsageMap,
+            pausedDomains,
+        });
+        isDirty = false;
+    }
 }
 
-// --- Hashing for Deterministic Rule IDs ---
+// --- Hashing for Rule IDs ---
 function simpleHash(str) {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = (hash << 5) - hash + char;
-        hash |= 0; // Convert to 32bit integer
+        hash = (hash << 5) - hash + str.charCodeAt(i);
+        hash |= 0;
     }
-    // Ensure the ID is positive and within a safe range for declarativeNetRequest
     return Math.abs(hash % 100000) + 1;
 }
 
-// --- Core Pause/Unpause Logic ---
+// --- Pause/Unpause Logic ---
 async function pauseDomain(domain) {
+    await dataLoadedPromise;
+    if (pausedDomains[domain]) return;
+    pausedDomains[domain] = true;
+
     const ruleId = simpleHash(domain);
-    const { pausedDomains = [] } = await chrome.storage.local.get('pausedDomains');
-
-    if (!pausedDomains.includes(domain)) {
-        pausedDomains.push(domain);
-        await chrome.storage.local.set({ pausedDomains });
-    }
-
     await chrome.declarativeNetRequest.updateDynamicRules({
         addRules: [{
             id: ruleId,
             priority: 1,
             action: { type: 'block' },
-            condition: { urlFilter: `||${domain}/`, resourceTypes: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'object', 'xmlhttprequest', 'other'] }
+            condition: { resourceTypes: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'object', 'xmlhttprequest', 'other'], urlFilter: `||${domain}/` }
         }]
     });
+    isDirty = true;
+    await saveData();
 }
 
 async function unpauseDomain(domain) {
+    await dataLoadedPromise;
+    if (!pausedDomains[domain]) return;
+    delete pausedDomains[domain];
+
     const ruleId = simpleHash(domain);
-    const { pausedDomains = [] } = await chrome.storage.local.get('pausedDomains');
-
-    const index = pausedDomains.indexOf(domain);
-    if (index > -1) {
-        pausedDomains.splice(index, 1);
-        await chrome.storage.local.set({ pausedDomains });
-    }
-
     await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [ruleId] });
+    isDirty = true;
+    await saveData();
 }
 
-// --- Event Listeners ---
+// --- Core Data Tracking Logic ---
 chrome.webRequest.onCompleted.addListener(
   async (details) => {
-    const { pausedDomains = [] } = await chrome.storage.local.get('pausedDomains');
-    const url = new URL(details.url);
-    const domain = url.hostname;
+    await dataLoadedPromise;
+    const { initiator, url, responseHeaders, tabId } = details;
 
-    if (pausedDomains.includes(domain)) return;
+    // Ignore requests from the extension itself
+    if (initiator && initiator.startsWith('chrome-extension://' + chrome.runtime.id)) return;
 
-    const headers = details.responseHeaders;
-    const contentLength = headers.find(h => h.name.toLowerCase() === 'content-length');
-    const size = contentLength ? parseInt(contentLength.value, 10) : 0;
+    let primaryDomain;
+    const requestDomain = new URL(url).hostname;
 
-    if (!domainDataUsage[domain]) {
-      domainDataUsage[domain] = { totalSize: 0, warned: false, paused: false };
-    }
-    domainDataUsage[domain].totalSize += size;
-
-    const PAUSE_THRESHOLD = 1024 * 1024 * 1024;
-    const WARNING_THRESHOLD = 500 * 1024 * 1024;
-
-    if (domainDataUsage[domain].totalSize > PAUSE_THRESHOLD && !domainDataUsage[domain].paused) {
-        chrome.notifications.create(`pause-${domain}`, { type: 'basic', iconUrl: 'icon.png', title: 'Data Limit Exceeded', message: `Site "${domain}" used over 1GB.`, buttons: [{ title: 'Pause Site' }]});
-        domainDataUsage[domain].paused = true;
-    } else if (domainDataUsage[domain].totalSize > WARNING_THRESHOLD && !domainDataUsage[domain].warned) {
-        chrome.notifications.create({ type: 'basic', iconUrl: 'icon.png', title: 'High Data Usage', message: `Site "${domain}" used over 500MB.`});
-        domainDataUsage[domain].warned = true;
-    }
-    await chrome.storage.local.set({ dataUsage: domainDataUsage });
-
-    chrome.tabs.get(details.tabId, (tab) => {
-        if (tab && !tab.active) {
-            if (!backgroundActivity[domain]) {
-                backgroundActivity[domain] = { firstRequestTime: Date.now() };
+    if (tabId !== -1) {
+        try {
+            // This is the most reliable way to get the domain
+            const tab = await chrome.tabs.get(tabId);
+            if (tab && tab.url) {
+                primaryDomain = new URL(tab.url).hostname;
+                // Map service usage if the request is for a different domain
+                if (primaryDomain !== requestDomain) {
+                    if (!serviceUsageMap[requestDomain]) serviceUsageMap[requestDomain] = new Set();
+                    serviceUsageMap[requestDomain].add(primaryDomain);
+                }
+            } else {
+                 // Tab exists but has no URL, fallback to initiator
+                 primaryDomain = initiator ? new URL(initiator).hostname : requestDomain;
+            }
+        } catch (e) {
+            // Tab might be closed, this is a common case. Fallback to initiator.
+            if (chrome.runtime.lastError && (chrome.runtime.lastError.message.includes('No tab with id') || chrome.runtime.lastError.message.includes('Invalid tab ID'))) {
+                primaryDomain = initiator ? new URL(initiator).hostname : requestDomain;
+            } else {
+                console.error(e);
+                primaryDomain = requestDomain;
             }
         }
-    });
+    } else {
+        // Background request, attribute to initiator or service
+        if (initiator) {
+            primaryDomain = new URL(initiator).hostname;
+        } else {
+            // If a service is used by only one domain, attribute it there
+            const users = serviceUsageMap[requestDomain];
+            primaryDomain = (users && users.size === 1) ? Array.from(users)[0] : requestDomain;
+        }
+    }
+
+    if (pausedDomains[primaryDomain]) return;
+
+    const size = parseInt(responseHeaders.find(h => h.name.toLowerCase() === 'content-length')?.value || '0', 10);
+    if (size === 0) return;
+
+    if (!dataUsage[primaryDomain]) {
+      dataUsage[primaryDomain] = { totalSize: 0, perTab: {} };
+    }
+
+    dataUsage[primaryDomain].totalSize += size;
+
+    if (tabId !== -1) {
+        if (!dataUsage[primaryDomain].perTab[tabId]) {
+            dataUsage[primaryDomain].perTab[tabId] = 0;
+        }
+        dataUsage[primaryDomain].perTab[tabId] += size;
+    }
+    isDirty = true;
   },
-  { urls: ['<all_urls>'], types: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'object', 'xmlhttprequest', 'other'] },
+  { urls: ['<all_urls>'], types: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'font', 'object', 'xmlhttprequest', 'ping', 'csp_report', 'media', 'other'] },
   ['responseHeaders']
 );
 
-chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
-    if (buttonIndex === 0) {
-        if (notificationId.startsWith('pause-')) {
-            pauseDomain(notificationId.replace('pause-', ''));
-        } else if (notificationId.startsWith('proactive-pause-')) {
-            pauseDomain(notificationId.replace('proactive-pause-', ''));
+
+// --- Soft Pause Logic ---
+async function updateSoftPauseRules() {
+    const { settings } = await chrome.storage.local.get('settings');
+    if (!settings || !settings.softPauseEnabled) return;
+
+    const tabs = await chrome.tabs.query({ active: true });
+    const activeDomains = new Set(tabs.map(tab => {
+        try {
+            return new URL(tab.url).hostname;
+        } catch {
+            return null;
+        }
+    }).filter(Boolean));
+
+    const allTabs = await chrome.tabs.query({});
+    const allDomains = new Set(allTabs.map(tab => {
+        try {
+            return new URL(tab.url).hostname;
+        } catch {
+            return null;
+        }
+    }).filter(Boolean));
+
+    const rulesToRemove = [];
+    const rulesToAdd = [];
+
+    for (const domain of allDomains) {
+        const ruleId = simpleHash(`soft-pause-${domain}`);
+        if (activeDomains.has(domain)) {
+            rulesToRemove.push(ruleId);
+        } else {
+            rulesToAdd.push({
+                id: ruleId,
+                priority: 2,
+                action: { type: 'block' },
+                condition: { resourceTypes: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'object', 'xmlhttprequest', 'other'], urlFilter: `||${domain}/` }
+            });
         }
     }
-});
 
-chrome.webNavigation.onCommitted.addListener(async (details) => {
-    if (details.frameId !== 0 || !['reload', 'start_page'].includes(details.transitionType)) return;
-
-    const { pausedDomains = [] } = await chrome.storage.local.get('pausedDomains');
-    const domain = new URL(details.url).hostname;
-
-    if (pausedDomains.includes(domain)) {
-        await unpauseDomain(domain);
-        setTimeout(() => pauseDomain(domain), 60000);
+    if (rulesToRemove.length > 0) {
+        await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: rulesToRemove });
     }
-});
+    if (rulesToAdd.length > 0) {
+        await chrome.declarativeNetRequest.updateDynamicRules({ addRules: rulesToAdd });
+    }
+}
 
+
+// --- Message Handling ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'unpauseDomain') {
-        unpauseDomain(request.domain).then(() => sendResponse({ success: true }));
-        return true;
-    }
-});
+    const actions = {
+        getTabInfo: getTabInfo,
+        unpauseDomain: (req) => unpauseDomain(req.domain),
+        pauseDomain: (req) => pauseDomain(req.domain),
+        clearAllData: clearAllData,
+        setAutoPause: (req) => setAutoPause(req.domain, req.time),
+        cancelAllAutoPauseAlarms: cancelAllAutoPauseAlarms,
+        toggleSoftPauseGlobal: (req) => {
+            if (req.enabled) {
+                chrome.tabs.onActivated.addListener(updateSoftPauseRules);
+                chrome.tabs.onUpdated.addListener(updateSoftPauseRules);
+                updateSoftPauseRules();
+            } else {
+                chrome.tabs.onActivated.removeListener(updateSoftPauseRules);
+                chrome.tabs.onUpdated.removeListener(updateSoftPauseRules);
+                // remove all soft pause rules
+                chrome.declarativeNetRequest.getDynamicRules((rules) => {
+                    const ruleIds = rules.filter(r => r.id.startsWith('soft-pause-')).map(r => r.id);
+                    chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: ruleIds });
+                });
+            }
+        },
+    };
 
-chrome.tabs.onActivated.addListener(activeInfo => {
-    chrome.tabs.get(activeInfo.tabId, (tab) => {
-        if (tab && tab.url) {
-            try {
-                delete backgroundActivity[new URL(tab.url).hostname];
-            } catch (e) { /* Ignore invalid URLs */ }
+    const performAction = async () => {
+        await dataLoadedPromise;
+        if (actions[request.action]) {
+            const result = await actions[request.action](request);
+            sendResponse(result);
         }
-    });
+    };
+
+    performAction();
+    return true;
 });
 
-chrome.alarms.onAlarm.addListener(alarm => {
-    if (alarm.name === 'backgroundActivityChecker') {
-        const now = Date.now();
-        for (const domain in backgroundActivity) {
-            if (now - backgroundActivity[domain].firstRequestTime > 300000) {
-                chrome.notifications.create(`proactive-pause-${domain}`, { type: 'basic', iconUrl: 'icon.png', title: 'Background Activity Detected', message: `The site "${domain}" has been using data in the background for over 5 minutes. Would you like to pause it?`, buttons: [{ title: 'Pause Site' }]});
-                delete backgroundActivity[domain];
+async function setAutoPause(domain, time) {
+    const [hours, minutes] = time.split(':');
+    const now = new Date();
+    const alarmTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+
+    if (alarmTime < now) {
+        alarmTime.setDate(alarmTime.getDate() + 1);
+    }
+
+    chrome.alarms.create(`auto-pause-${domain}`, {
+        when: alarmTime.getTime(),
+        periodInMinutes: 24 * 60
+    });
+}
+
+async function cancelAllAutoPauseAlarms() {
+    const allAlarms = await chrome.alarms.getAll();
+    const autoPauseAlarms = allAlarms.filter(alarm => alarm.name.startsWith('auto-pause-'));
+    for (const alarm of autoPauseAlarms) {
+        await chrome.alarms.clear(alarm.name);
+    }
+}
+
+async function getTabInfo() {
+    const tabs = await chrome.tabs.query({});
+    const tabData = {};
+
+    for (const tab of tabs) {
+        if (tab.url && (tab.url.startsWith('http:') || tab.url.startsWith('https:'))) {
+            try {
+                const domain = new URL(tab.url).hostname;
+                if (!tabData[domain]) {
+                    tabData[domain] = { tabs: [], topTab: null };
+                }
+                tabData[domain].tabs.push({ tabId: tab.id, windowId: tab.windowId, title: tab.title });
+
+                const domainUsage = dataUsage[domain];
+                if (domainUsage?.perTab) {
+                    let maxUsage = 0;
+                    let topTabId = -1;
+                    for (const tabIdStr in domainUsage.perTab) {
+                        const currentTabId = parseInt(tabIdStr, 10);
+                        if (domainUsage.perTab[currentTabId] > maxUsage) {
+                            maxUsage = domainUsage.perTab[currentTabId];
+                            topTabId = currentTabId;
+                        }
+                    }
+                    if (topTabId !== -1) {
+                        const topTabInfo = tabData[domain].tabs.find(t => t.tabId === topTabId);
+                        if (topTabInfo) {
+                            tabData[domain].topTab = { ...topTabInfo, usage: maxUsage };
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error(`Error processing tab URL: ${tab.url}`, e);
             }
         }
+    }
+    return { tabData };
+}
+
+// --- Data Reset Logic ---
+async function clearAllData() {
+    const totalUsage = Object.values(dataUsage).reduce((sum, site) => sum + site.totalSize, 0);
+
+    dataUsage = {};
+    serviceUsageMap = {};
+    isDirty = false;
+
+    await chrome.storage.local.set({
+        lastMonthUsage: totalUsage,
+        dataUsage: {},
+        serviceUsageMap: {},
+        lastResetDate: new Date().toISOString()
+    });
+}
+
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+    await dataLoadedPromise;
+    if (alarm.name === 'dataSaver') {
+        saveData();
+    } else if (alarm.name === 'dailyResetChecker') {
+        const { settings, lastResetDate } = await chrome.storage.local.get(['settings', 'lastResetDate']);
+        if (!settings || !settings.resetDay) return;
+
+        const now = new Date();
+        // If there's no last reset date, set it to now and exit.
+        if (!lastResetDate) {
+            await chrome.storage.local.set({ lastResetDate: now.toISOString() });
+            return;
+        }
+
+        const lastReset = new Date(lastResetDate);
+        let nextReset = new Date(lastReset);
+
+        // Calculate next reset date, ensuring it's in the future
+        if (now.getDate() >= settings.resetDay) {
+            nextReset.setMonth(now.getMonth() + 1);
+            nextReset.setDate(settings.resetDay);
+        } else {
+            nextReset.setDate(settings.resetDay);
+        }
+
+        // If the calculated next reset is in the past, it means we are in the next cycle
+        if (now >= nextReset) {
+            await clearAllData();
+        }
+    } else if (alarm.name.startsWith('auto-pause-')) {
+        const domain = alarm.name.replace('auto-pause-', '');
+        await pauseDomain(domain);
     }
 });

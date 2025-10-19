@@ -1,18 +1,119 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Data Tracker</title>
-  <link rel="stylesheet" href="popup.css">
+    <title>Datafy</title>
+    <link rel="stylesheet" type="text/css" href="popup.css">
 </head>
 <body>
-  <h1>Data Usage</h1>
-  <div id="data-container"></div>
-  <hr>
-  <h2>Paused Sites</h2>
-  <div id="paused-container"></div>
-  <div class="footer">
-    <a href="about.html" target="_blank">About</a>
-  </div>
-  <script src="popup.js"></script>
+    <div id="setup-view">
+        <h2>Welcome to Datafy</h2>
+        <p>To get started, please select the day of the month you'd like your data usage to reset.</p>
+        <div class="setting-row">
+            <label for="setup-reset-day-select">Reset on day:</label>
+            <select id="setup-reset-day-select"></select>
+        </div>
+        <div class="setting-row">
+            <label for="setup-reset-period-select">Reset period</label>
+            <select id="setup-reset-period-select">
+                <option value="30">Monthly</option>
+                <option value="7">Weekly</option>
+            </select>
+        </div>
+        <button id="save-setup-btn">Save and Continue</button>
+    </div>
+
+    <div id="main-view">
+        <div class="header-container">
+            <div class="title-container">
+                <img src="icon_v2.svg" class="header-icon" alt="Datafy icon">
+                <h1>Datafy</h1>
+            </div>
+            <div id="total-usage-container">
+                <span id="total-usage"></span>
+                <span id="last-month-comparison"></span>
+                <span id="since-date-info"></span>
+                <button id="settings-btn" class="icon-btn" title="Settings">
+                    <img src="settings-icon.svg" alt="Settings">
+                </button>
+            </div>
+        </div>
+        <div class="tab-container">
+            <button class="tab-link active" data-tab="data-usage-tab">Usage</button>
+            <div class="tab-spacer"></div>
+            <button class="tab-link" data-tab="settings-tab">Settings</button>
+            <button class="tab-link" data-tab="about-tab">About</button>
+            <button class="tab-link" data-tab="credits-tab">Credits</button>
+        </div>
+        <div id="data-usage-tab" class="tab-content active">
+            <div id="loading-message">Loading data...</div>
+            <div id="sites-container"></div>
+        </div>
+        <div id="settings-tab" class="tab-content">
+            <div class="tab-content-scroll">
+                <div class="setting-card">
+                    <h2>Data Reset</h2>
+                    <div class="setting-row">
+                    <label for="reset-day-select">Reset day</label>
+                    <select id="reset-day-select"></select>
+                </div>
+                <div class="setting-row">
+                    <label for="reset-period-select">Reset period</label>
+                    <select id="reset-period-select">
+                        <option value="30">Monthly</option>
+                        <option value="7">Weekly</option>
+                    </select>
+                </div>
+            </div>
+            <div class="setting-card">
+                <h2>Data Comparison</h2>
+                <div class="setting-row">
+                    <label for="always-compare-toggle">Always show comparison</label>
+                    <label class="switch">
+                        <input type="checkbox" id="always-compare-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="setting-card">
+                <h2>Auto Pause</h2>
+                <div class="setting-row">
+                    <label for="auto-pause-toggle">Enable auto pause</label>
+                    <label class="switch">
+                        <input type="checkbox" id="auto-pause-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <label for="auto-pause-time-default">Default auto pause time</label>
+                    <input type="time" id="auto-pause-time-default">
+                </div>
+            </div>
+            <div class="setting-card">
+                <h2>Soft Pause</h2>
+                <div class="setting-row">
+                    <label for="soft-pause-toggle">Enable soft pause</label>
+                    <label class="switch">
+                        <input type="checkbox" id="soft-pause-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+            </div>
+        </div>
+        <div id="about-tab" class="tab-content">
+            <div class="about-content">
+                <h2>About Datafy</h2>
+                <p>Authored by ROKCT Holdings.</p>
+                <p>This extension helps you monitor and control your data usage.</p>
+                <p>Version: <span id="version-number"></span></p>
+                <p>Browser: <span id="browser-version"></span></p>
+                <button id="clear-data-btn" class="danger-btn">Clear All Data</button>
+            </div>
+        </div>
+        <div id="credits-tab" class="tab-content"></div>
+    </div>
+
+    <script src="showdown.min.js"></script>
+    <script src="popup.js"></script>
 </body>
 </html>

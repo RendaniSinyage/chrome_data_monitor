@@ -1,15 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Data Tracker",
-  "version": "1.0",
+  "name": "Datafy",
+  "version": "1.35.5",
   "description": "A Chrome extension to monitor data usage per website.",
   "permissions": [
     "webRequest",
     "storage",
-    "activeTab",
+    "tabs",
     "notifications",
     "declarativeNetRequest",
-    "declarativeNetRequestWithHostAccess",
     "webNavigation",
     "alarms"
   ],
@@ -17,10 +16,19 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon_v2.svg",
+      "48": "icon_v2.svg",
+      "128": "icon_v2.svg"
+    }
+  },
+  "icons": {
+    "16": "icon_v2.svg",
+    "48": "icon_v2.svg",
+    "128": "icon_v2.svg"
   },
   "host_permissions": [
     "<all_urls>"
-  ],
-  "declarative_net_request": {}
+  ]
 }
