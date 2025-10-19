@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const resetDaySelect = document.getElementById('reset-day-select');
         const resetPeriodSelect = document.getElementById('reset-period-select');
         const autoPauseToggle = document.getElementById('auto-pause-toggle');
+        const autoPauseTimeDefault = document.getElementById('auto-pause-time-default');
 
         // Populate reset day dropdown
         for (let i = 1; i <= 31; i++) {
@@ -61,9 +62,11 @@ document.addEventListener('DOMContentLoaded', () => {
             resetDaySelect.value = settings.resetDay || 1;
             resetPeriodSelect.value = settings.resetPeriod || '30';
             autoPauseToggle.checked = settings.autoPauseEnabled !== false;
+            autoPauseTimeDefault.value = settings.autoPauseTimeDefault || '00:00';
         } else {
             alwaysCompareToggle.checked = true;
             autoPauseToggle.checked = true;
+            autoPauseTimeDefault.value = '00:00';
         }
 
         function saveSettings() {
@@ -73,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 newSettings.resetDay = parseInt(resetDaySelect.value, 10);
                 newSettings.resetPeriod = resetPeriodSelect.value;
                 newSettings.autoPauseEnabled = autoPauseToggle.checked;
+                newSettings.autoPauseTimeDefault = autoPauseTimeDefault.value;
                 chrome.storage.local.set({ settings: newSettings });
 
                 if (!newSettings.autoPauseEnabled) {
@@ -83,6 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         alwaysCompareToggle.addEventListener('change', saveSettings);
         autoPauseToggle.addEventListener('change', saveSettings);
+        autoPauseTimeDefault.addEventListener('change', saveSettings);
         resetDaySelect.addEventListener('change', saveSettings);
         resetPeriodSelect.addEventListener('change', saveSettings);
     }
@@ -229,6 +234,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (autoPauseTimes && autoPauseTimes[domain]) {
                 autoPauseBtn.classList.add('highlight');
                 timeInput.value = autoPauseTimes[domain];
+            } else {
+                timeInput.value = settings.autoPauseTimeDefault || '00:00';
             }
 
             autoPauseBtn.addEventListener('click', () => {

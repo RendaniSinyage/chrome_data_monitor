@@ -324,12 +324,6 @@ h1 {
     justify-content: center;
 }
 
-.icon-btn {
-    width: 20px;
-    height: 20px;
-    fill: #7f8c8d;
-}
-
 .icon-btn:hover {
     background-color: #f0f0f0;
 }
@@ -421,8 +415,8 @@ h1 {
 .setting-card {
     border: 1px solid #e0e0e0;
     border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 20px;
+    padding: 15px;
+    margin-bottom: 15px;
 }
 
 .setting-card h2 {
