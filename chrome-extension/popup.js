@@ -2,6 +2,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Element Cache ---
     const elements = {
         sitesContainer: document.getElementById('sites-container'),
+        pausedSitesContainer: document.getElementById('paused-sites-container'),
+        pausedSitesList: document.getElementById('paused-sites-list'),
         totalUsage: document.getElementById('total-usage'),
         lastMonthComparison: document.getElementById('last-month-comparison'),
         sinceDateInfo: document.getElementById('since-date-info'),
@@ -133,44 +135,63 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderSites(dataUsage, pausedDomains, tabData, autoPauseTimes, settings) {
         elements.loadingMessage.style.display = 'none';
         elements.sitesContainer.innerHTML = '';
-        const allDomains = new Set([...Object.keys(dataUsage || {}), ...Object.keys(pausedDomains || {})]);
+        elements.pausedSitesList.innerHTML = '';
 
-        if (allDomains.size === 0) {
+        const allDomains = Object.keys(dataUsage || {});
+        const pausedDomainKeys = Object.keys(pausedDomains || {});
+
+        const activeDomains = allDomains.filter(d => !pausedDomains[d]);
+        const pausedDomainEntries = pausedDomainKeys.map(domain => ({
+            domain,
+            usage: dataUsage[domain]?.totalSize || 0,
+            isPaused: true
+        })).sort((a, b) => b.usage - a.usage);
+
+        if (activeDomains.length === 0 && pausedDomainEntries.length === 0) {
             elements.sitesContainer.innerHTML = '<div class="site-entry"><div class="site-info">No data tracked yet. Browse some sites to see usage.</div></div>';
             elements.totalUsage.textContent = 'Total: 0 B';
+            elements.pausedSitesContainer.style.display = 'none';
             return;
         }
 
-        const allDomainsRanked = Array.from(allDomains).map(domain => ({
+        const activeDomainsRanked = activeDomains.map(domain => ({
             domain,
             usage: dataUsage[domain]?.totalSize || 0,
             hasTabs: (tabData[domain]?.tabs?.length || 0) > 0,
         }));
 
-        const sitesWithTabs = allDomainsRanked.filter(d => d.hasTabs).sort((a, b) => b.usage - a.usage);
-        const sitesWithoutTabs = allDomainsRanked.filter(d => !d.hasTabs).sort((a, b) => b.usage - a.usage);
+        const sitesWithTabs = activeDomainsRanked.filter(d => d.hasTabs).sort((a, b) => b.usage - a.usage);
+        const sitesWithoutTabs = activeDomainsRanked.filter(d => !d.hasTabs).sort((a, b) => b.usage - a.usage);
 
-        const sortedDomains = [...sitesWithTabs, ...sitesWithoutTabs];
+        const sortedActiveDomains = [...sitesWithTabs, ...sitesWithoutTabs];
         let totalBytes = 0;
-        allDomainsRanked.forEach(d => totalBytes += d.usage);
+        [...activeDomainsRanked, ...pausedDomainEntries].forEach(d => totalBytes += d.usage);
         elements.totalUsage.textContent = `Total: ${formatBytes(totalBytes)}`;
 
-        if (sortedDomains.length <= 4) {
-            sortedDomains.forEach(item => {
-                const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain], autoPauseTimes, settings);
+        if (sortedActiveDomains.length <= 4) {
+            sortedActiveDomains.forEach(item => {
+                const siteEntry = createSingleSiteEntry(item.domain, item.usage, false, tabData[item.domain], autoPauseTimes, settings);
                 elements.sitesContainer.appendChild(siteEntry);
             });
         } else {
-            const displayList = sortedDomains.slice(0, 3);
-            const others = sortedDomains.slice(3);
-
+            const displayList = sortedActiveDomains.slice(0, 3);
+            const others = sortedActiveDomains.slice(3);
             displayList.forEach(item => {
-                const siteEntry = createSingleSiteEntry(item.domain, item.usage, pausedDomains[item.domain], tabData[item.domain], autoPauseTimes, settings);
+                const siteEntry = createSingleSiteEntry(item.domain, item.usage, false, tabData[item.domain], autoPauseTimes, settings);
                 elements.sitesContainer.appendChild(siteEntry);
             });
-
             const compoundedEntry = createCompoundedSiteEntry(others, pausedDomains, tabData, autoPauseTimes, settings);
             elements.sitesContainer.appendChild(compoundedEntry);
+        }
+
+        if (pausedDomainEntries.length > 0) {
+            elements.pausedSitesContainer.style.display = 'block';
+            pausedDomainEntries.forEach(item => {
+                const siteEntry = createSingleSiteEntry(item.domain, item.usage, true, tabData[item.domain], autoPauseTimes, settings);
+                elements.pausedSitesList.appendChild(siteEntry);
+            });
+        } else {
+            elements.pausedSitesContainer.style.display = 'none';
         }
     }
 
