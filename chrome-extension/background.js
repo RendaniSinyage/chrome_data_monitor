@@ -53,7 +53,8 @@ function simpleHash(str) {
         hash = (hash << 5) - hash + str.charCodeAt(i);
         hash |= 0;
     }
-    return Math.abs(hash % 100000) + 1;
+    // Return as a string to ensure startsWith works correctly
+    return `rule_${Math.abs(hash % 100000) + 1}`;
 }
 
 // --- Pause/Unpause Logic ---
@@ -225,7 +226,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 chrome.tabs.onUpdated.removeListener(updateSoftPauseRules);
                 // remove all soft pause rules
                 chrome.declarativeNetRequest.getDynamicRules((rules) => {
-                    const ruleIds = rules.filter(r => r.id.startsWith('soft-pause-')).map(r => r.id);
+                    const ruleIds = rules.filter(r => r.id.startsWith('rule_')).map(r => r.id);
                     chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: ruleIds });
                 });
             }
