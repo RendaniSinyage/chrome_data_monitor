@@ -20,10 +20,12 @@ chrome.runtime.onStartup.addListener(() => {
     // Data is already being loaded by the top-level promise
 });
 
-chrome.runtime.onInstalled.addListener((details) => {
+chrome.runtime.onInstalled.addListener(async (details) => {
     chrome.alarms.create('dataSaver', { periodInMinutes: 1 / 30 });
     chrome.alarms.create('dailyResetChecker', { periodInMinutes: 60 });
+
     if (details.reason === 'install') {
+        await clearAllData();
         chrome.storage.local.set({ isSetupComplete: false });
     }
 });
@@ -310,14 +312,23 @@ async function clearAllData() {
 
     dataUsage = {};
     serviceUsageMap = {};
+    pausedDomains = {};
     isDirty = false;
 
     await chrome.storage.local.set({
         lastMonthUsage: totalUsage,
         dataUsage: {},
         serviceUsageMap: {},
+        pausedDomains: {},
         lastResetDate: new Date().toISOString()
     });
+
+    // Clear all declarativeNetRequest rules
+    const rules = await chrome.declarativeNetRequest.getDynamicRules();
+    const ruleIds = rules.map(rule => rule.id);
+    if (ruleIds.length > 0) {
+        await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: ruleIds });
+    }
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
